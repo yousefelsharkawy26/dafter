@@ -1,0 +1,162 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Daftar.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Daftar.Views.SellView"
+             x:DataType="vm:SellViewModel"
+             FlowDirection="RightToLeft">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="16">
+
+        <!-- customer + totals -->
+        <Border Grid.Row="0" Classes="card" Margin="0,0,0,12">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16">
+                <StackPanel Grid.Column="0" Spacing="6">
+                    <TextBlock Classes="muted" Text="العميل" />
+                    <ComboBox ItemsSource="{Binding Customers}"
+                              SelectedItem="{Binding SelectedCustomer}"
+                              HorizontalAlignment="Stretch"
+                              MinHeight="36">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PartyOption">
+                                <TextBlock Text="{Binding Display}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Spacing="2" MinWidth="130">
+                    <TextBlock Classes="muted" Text="الإجمالي" />
+                    <TextBlock Classes="tile-value" Text="{Binding TotalText}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Spacing="2" MinWidth="130">
+                    <TextBlock Classes="muted" Text="المتبقي" />
+                    <TextBlock Classes="tile-value"
+                               Text="{Binding AmountDueText}"
+                               Foreground="#D24726" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- cart -->
+        <Border Grid.Row="1" Classes="card" Margin="0,0,0,12">
+            <DataGrid ItemsSource="{Binding Cart}" AutoGenerateColumns="False">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="الصنف" Binding="{Binding Name}" Width="2*" />
+                    <DataGridTextColumn Header="الكمية" Binding="{Binding QuantityText}" Width="100" />
+                    <DataGridTextColumn Header="وحدة" Binding="{Binding UnitName}" Width="90" />
+                    <DataGridTextColumn Header="السعر" Binding="{Binding UnitPriceText}" Width="100" />
+                    <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotalText}" Width="110" />
+                    <DataGridTemplateColumn Header="" Width="50">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="vm:CartLine">
+                                <Button Classes="ghost" Padding="6,0" Content="✕"
+                                        Command="{Binding $parent[Window].((vm:SellViewModel)DataContext).RemoveLineCommand}"
+                                        CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- add product + save -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="بحث:" VerticalAlignment="Center" />
+                <TextBox Text="{Binding Search}" PlaceholderText="اسم الصنف أو الكود" Width="240" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <AutoCompleteBox ItemsSource="{Binding Products}"
+                                 SelectedItem="{Binding SelectedProduct}"
+                                 PlaceholderText="اكتب اسم الصنف أو الكود"
+                                 Width="300">
+                    <AutoCompleteBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ProductOption">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding Display}" />
+                                <TextBlock Classes="muted"
+                                           Text="{Binding OnHand, StringFormat='متاح: {0}'}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </AutoCompleteBox.ItemTemplate>
+                </AutoCompleteBox>
+
+                <TextBox Text="{Binding Quantity}" Width="80" PlaceholderText="كمية" />
+                <Button Content="إضافة" Command="{Binding AddToCartCommand}" />
+            </StackPanel>
+
+
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8">
+                <Button Classes="ghost" Content="تفريغ" Command="{Binding ClearCommand}" />
+                <Button Classes="primary" Content="حفظ الفاتورة"
+                        Command="{Binding PostCommand}" IsEnabled="{Binding CanPost}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- how the sale is settled: fully, partly, or on account -->
+        <Border Grid.Row="3" Classes="card" Margin="0,12,0,0">
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="220,280,*,140" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Classes="muted" Text="التحصيل" />
+                        <ComboBox ItemsSource="{Binding Settlement.Choices}"
+                                  SelectedItem="{Binding Settlement.Choice}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettlementOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Spacing="2"
+                                IsVisible="{Binding Settlement.IsActive}">
+                        <TextBlock Classes="muted" Text="طريقة الدفع" />
+                        <ComboBox ItemsSource="{Binding Settlement.Methods}"
+                                  SelectedItem="{Binding Settlement.Method}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MethodOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Spacing="2"
+                                IsVisible="{Binding Settlement.IsActive}">
+                        <TextBlock Classes="muted" Text="الحساب اللي الفلوس هتوصله" />
+                        <ComboBox ItemsSource="{Binding Settlement.Accounts}"
+                                  SelectedItem="{Binding Settlement.Account}"
+                                  PlaceholderText="اختار الحساب">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AccountRow">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Spacing="2"
+                                IsVisible="{Binding Settlement.IsPartial}">
+                        <TextBlock Classes="muted" Text="المبلغ المدفوع دلوقتي" />
+                        <TextBox Text="{Binding Settlement.PartialAmount}"
+                                 PlaceholderText="0.00" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Classes="muted" TextWrapping="Wrap"
+                           Text="البيع على الحساب بيخلي العميل مدين لك. لو دفعت جزء، الباقي بيفضل عليك لحد ما تلمعه من شاشة المقبوضات." />
+
+                <TextBlock Classes="muted" Text="{Binding Settlement.Problem}"
+                           IsVisible="{Binding Settlement.Problem,
+                                Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</UserControl>

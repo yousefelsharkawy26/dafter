@@ -1,0 +1,107 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Daftar.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Daftar.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel"
+             FlowDirection="RightToLeft">
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="16">
+
+            <!-- at a glance (Windows 8 Live Tiles) -->
+            <WrapPanel Orientation="Horizontal">
+                <Border Classes="tile tile-emerald" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Classes="tile-label" Text="تحصيل النهاردة" />
+                        <TextBlock Classes="tile-value" Text="{Binding TodayCash}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="tile tile-blue" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Classes="tile-label" Text="مبيعات النهاردة" />
+                        <TextBlock Classes="tile-value" Text="{Binding TodaySales}" />
+                        <TextBlock Classes="tile-label" Text="{Binding TodaySalesCount, StringFormat='عدد الفواتير: {0}'}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="tile tile-purple" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Classes="tile-label" Text="صافي المركز (لك - عليك)" />
+                        <TextBlock Classes="tile-value" Text="{Binding NetPosition}" />
+                        <TextBlock Classes="tile-label"
+                                   Text="{Binding TotalPayables, StringFormat='اللي علينا للموردين: {0}'}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="tile tile-orange" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Classes="tile-label" Text="إجمالي المستحق" />
+                        <TextBlock Classes="tile-value" Text="{Binding TotalReceivables}" />
+                        <TextBlock Classes="tile-label" Text="{Binding TotalOverdue, StringFormat='متأخر: {0}'}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="tile tile-crimson" Margin="0,0,12,12">
+                    <StackPanel>
+                        <TextBlock Classes="tile-label" Text="أصناف تحت الحد" />
+                        <TextBlock Classes="tile-value" Text="{Binding LowStockCount}" />
+                    </StackPanel>
+                </Border>
+            </WrapPanel>
+
+            <TextBlock Classes="muted" Text="{Binding BusyText}" IsVisible="{Binding !Loaded}" />
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+
+            <!-- receivables -->
+                <Border Grid.Column="0" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="heading" Text="اللي عليهم فلوس" />
+                        <DataGrid ItemsSource="{Binding Receivables}" MaxHeight="260">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="العميل" Binding="{Binding Customer}" Width="*" />
+                                <DataGridTextColumn Header="المبلغ" Binding="{Binding Balance}" Width="110" />
+                                <DataGridTextColumn Header="متأخر (يوم)"
+                                                    Binding="{Binding DaysOverdue}" Width="100" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Border>
+
+                <!-- payables: suppliers we owe -->
+                <Border Grid.Column="1" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="heading" Text="اللي علينا للموردين" />
+                        <DataGrid ItemsSource="{Binding Payables}" MaxHeight="200">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="المورد" Binding="{Binding Supplier}" Width="*" />
+                                <DataGridTextColumn Header="المبلغ" Binding="{Binding Balance}" Width="110" />
+                                <DataGridTextColumn Header="متأخر (يوم)"
+                                                    Binding="{Binding DaysOverdue}" Width="100" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Border>
+
+            </Grid>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+
+                <!-- recent sales -->
+                <Border Grid.Column="0" Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="heading" Text="آخر الفواتير" />
+                        <DataGrid ItemsSource="{Binding RecentSales}" MaxHeight="260">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="رقم" Binding="{Binding DocNo}" Width="110" />
+                                <DataGridTextColumn Header="العميل" Binding="{Binding Customer}" Width="*" />
+                                <DataGridTextColumn Header="الإجمالي" Binding="{Binding Total}" Width="100" />
+                                <DataGridTextColumn Header="الربح" Binding="{Binding Margin}" Width="100" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

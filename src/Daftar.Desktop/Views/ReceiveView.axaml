@@ -1,0 +1,264 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Daftar.ViewModels"
+             x:Class="Daftar.Views.ReceiveView"
+             x:DataType="vm:ReceiveViewModel"
+             FlowDirection="RightToLeft">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="16">
+
+        <!-- header: supplier, invoice no, total -->
+        <Border Grid.Row="0" Classes="card" Margin="0,0,0,12">
+            <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="16">
+                <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Classes="muted" Text="المورد" />
+                    <ComboBox ItemsSource="{Binding Suppliers}"
+                              SelectedItem="{Binding SelectedSupplier}"
+                              PlaceholderText="اختار المورد" HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PartyRow">
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Classes="muted" Text="رقم الفاتورة (بيتولّد تلقائي — تقدر تعدّله)" />
+                    <TextBox Text="{Binding InvoiceNo}" PlaceholderText="اختياري" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Spacing="2" MinWidth="150">
+                    <TextBlock Classes="muted" Text="الإجمالي" />
+                    <TextBlock Classes="tile-value" Text="{Binding TotalText}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- add a line -->
+        <Border Grid.Row="1" Classes="card" Margin="0,0,0,20" >
+            <StackPanel Spacing="8">
+                <TextBlock Classes="heading" Text="إضافة سطر" />
+
+                <Grid ColumnDefinitions="*,*,100,120,Auto" RowDefinitions="40, auto" ColumnSpacing="8">
+                    <!-- A ComboBox, not an AutoCompleteBox: Avalonia 12 dropped
+                    BoxItemTemplate, so a chosen AutoCompleteBox item falls back to
+                    ToString() and the manager sees the raw record. -->
+                    <ComboBox Grid.Column="0" ItemsSource="{Binding Products}"
+                              SelectedItem="{Binding SelectedProduct}"
+                              PlaceholderText="الصنف" HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProductRow">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Classes="muted" Text="{Binding Sku}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <ComboBox Grid.Column="1" ItemsSource="{Binding Units}"
+                              SelectedItem="{Binding SelectedUnit}" PlaceholderText="الوحدة">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:UnitRow">
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <TextBox Grid.Column="2" Text="{Binding Quantity}" PlaceholderText="كمية" />
+
+                    <TextBox Grid.Column="3" Text="{Binding UnitPrice}" PlaceholderText="سعر الوحدة" />
+
+                    <Button Grid.Column="4" Content="إضافة" Command="{Binding AddLineCommand}" />
+
+                    <Button Grid.Row="1" Content="مسح فاتورة (صورة)" Classes="ghost"
+                            HorizontalAlignment="Left"
+                            IsEnabled="{Binding !Scanning}"
+                            Command="{Binding ScanCommand}" />
+
+                    <TextBlock Grid.Row="1" Classes="muted" Text="{Binding ScanStatus}"
+                               IsVisible="{Binding !HasScan}"
+                               TextWrapping="Wrap" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- how this receipt is settled: fully, partly, or not at all -->
+        <Border Grid.Row="3" Classes="card" Margin="0,0,0,12">
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="220,280,*,140" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Classes="muted" Text="الدفع" />
+                        <ComboBox ItemsSource="{Binding Settlement.Choices}"
+                                  SelectedItem="{Binding Settlement.Choice}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SettlementOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Spacing="2"
+                                IsVisible="{Binding Settlement.IsActive}">
+                        <TextBlock Classes="muted" Text="طريقة الدفع" />
+                        <ComboBox ItemsSource="{Binding Settlement.Methods}"
+                                  SelectedItem="{Binding Settlement.Method}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MethodOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Spacing="2"
+                                IsVisible="{Binding Settlement.IsActive}">
+                        <TextBlock Classes="muted" Text="الحساب اللي الفلوس هتوصله" />
+                        <ComboBox ItemsSource="{Binding Settlement.Accounts}"
+                                  SelectedItem="{Binding Settlement.Account}"
+                                  PlaceholderText="اختار الحساب">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AccountRow">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Spacing="2"
+                                IsVisible="{Binding Settlement.IsPartial}">
+                        <TextBlock Classes="muted" Text="المبلغ المدفوع دلوقتي" />
+                        <TextBox Text="{Binding Settlement.PartialAmount}"
+                                 PlaceholderText="0.00" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Classes="muted" TextWrapping="Wrap"
+                           Text="الاستلام بيسبب مستحق للمورد على طول. لو دفعت جزء، الباقي بيفضل علينا لحد ما تدفعه من شاشة المقبوضات." />
+
+                <TextBlock Classes="muted" Text="{Binding Settlement.Problem}"
+                           IsVisible="{Binding Settlement.Problem,
+                                Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </Border>
+
+        <!-- invoice scan: OCR proposes, the manager confirms -->
+        <Border Grid.Row="2" Classes="card" Margin="0,0,0,12"
+                IsVisible="{Binding HasScan}">
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Classes="muted"
+                               TextWrapping="Wrap"
+                               Text="{Binding ScanStatus}" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button Classes="ghost" Content="تجاهل"
+                                Command="{Binding DiscardScanCommand}" />
+                        <Button Classes="primary" Content="أضف السطور للفاتورة"
+                                Command="{Binding ConfirmScanCommand}" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- An ItemsControl, not a DataGrid: a DataGrid recycles cell content, so a
+                     ComboBox inside a cell receives its SelectedItem while ItemsSource is
+                     still empty and silently drops the pre-matched product. Nothing here
+                     needs column resizing or sorting, so explicit rows are simpler. -->
+                <Border BorderBrush="#D0D0D0" BorderThickness="1" CornerRadius="0">
+                    <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Scanned}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ScannedRow">
+                                    <Grid ColumnDefinitions="200,150,130,80,90,110"
+                                          ColumnSpacing="8" Margin="0,4">
+
+                                        <TextBlock Grid.Column="0" Text="{Binding Text}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
+
+                                        <ComboBox Grid.Column="1"
+                                                  ItemsSource="{Binding Choices}"
+                                                  SelectedItem="{Binding Product}"
+                                                  PlaceholderText="اختار الصنف">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ProductRow">
+                                                    <TextBlock Text="{Binding Name}" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+
+                                        <ComboBox Grid.Column="2"
+                                                  ItemsSource="{Binding AvailableUnits}"
+                                                  SelectedItem="{Binding Unit}"
+                                                  PlaceholderText="الوحدة">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:UnitRow">
+                                                    <TextBlock Text="{Binding Name}" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+
+                                        <TextBox Grid.Column="3"
+                                                 Text="{Binding Quantity}" />
+
+                                        <TextBox Grid.Column="4"
+                                                 Text="{Binding UnitPrice}"
+                                                 PlaceholderText="السعر مش مقروء" />
+
+                                        <TextBlock Grid.Column="5" Text="{Binding Confidence}"
+                                                   Classes="muted"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+                
+                <TextBlock Classes="muted" TextWrapping="Wrap"
+                           Text="القراءة الآلية بتغلط في أسماء الأصناف. راجع كل سطر واضغط زر «أضف السطور للفاتورة». الأرقام والأسعار بتتبقرأ أدق بكتير من الأسماء." />
+            </StackPanel>
+        </Border>
+
+        <!-- lines -->
+        <Border Grid.Row="4" Classes="card">
+            <Grid RowDefinitions="*,Auto" RowSpacing="10">
+                <DataGrid Grid.Row="0" ItemsSource="{Binding Lines}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="الصنف" Binding="{Binding ProductName}" Width="2*" />
+                        <DataGridTextColumn Header="الوحدة" Binding="{Binding UnitName}" Width="90" />
+                        <DataGridTextColumn Header="الكمية" Binding="{Binding QuantityText}" Width="90" />
+                        <DataGridTextColumn Header="أساسي" Binding="{Binding BaseQuantityText}" Width="90" />
+                        <DataGridTextColumn Header="السعر" Binding="{Binding UnitPriceText}" Width="100" />
+                        <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotalText}" Width="110" />
+
+                        <DataGridTemplateColumn Header="" Width="50">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="vm:ReceiveLine">
+                                    <Button Classes="ghost" Padding="6,0" Content="✕"
+                                            Command="{Binding $parent[Window].((vm:ReceiveViewModel)DataContext).RemoveLineCommand}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Classes="muted" Text="{Binding Status}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Classes="muted" Text="{Binding PostHint}"
+                                   IsVisible="{Binding PostHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button Classes="ghost" Content="تفريغ" Command="{Binding ClearCommand}" />
+                        <Button Classes="primary" Content="حفظ الاستلام"
+                                Command="{Binding PostCommand}" IsEnabled="{Binding CanPost}" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

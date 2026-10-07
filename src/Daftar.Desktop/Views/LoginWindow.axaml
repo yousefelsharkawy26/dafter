@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Daftar.ViewModels"
+        x:Class="Daftar.Views.LoginWindow"
+        x:DataType="vm:LoginViewModel"
+        Title="تسجيل الدخول"
+        Width="460" SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft"
+        Background="#0078D7">
+
+    <Border Margin="24" Background="#FFFFFF" CornerRadius="0" Padding="32"
+            BorderBrush="#005A9E" BorderThickness="1">
+        <StackPanel Spacing="16">
+
+            <StackPanel Spacing="4" Margin="0,0,0,12">
+                <TextBlock Text="daftar" FontSize="32" FontWeight="Bold"
+                           Foreground="#0078D7" HorizontalAlignment="Center" />
+                <TextBlock Classes="muted" Text="نظام إدارة المخزون والمبيعات"
+                           HorizontalAlignment="Center" FontSize="13" />
+            </StackPanel>
+
+            <!-- sign in -->
+            <StackPanel IsVisible="{Binding !MustChangePassword}" Spacing="12">
+                <TextBlock Text="اسم المستخدم" FontWeight="SemiBold" />
+                <TextBox Text="{Binding Username}" PlaceholderText="admin" />
+
+                <TextBlock Text="كلمة المرور" FontWeight="SemiBold" />
+                <TextBox Text="{Binding Password}" PasswordChar="●" PlaceholderText="••••" />
+
+                <TextBlock Text="{Binding Message}" Foreground="#E51400" TextWrapping="Wrap" />
+
+                <Button Classes="primary" Content="دخول"
+                        Command="{Binding SignInCommand}" IsEnabled="{Binding !Busy}"
+                        HorizontalAlignment="Stretch" Margin="0,8,0,0" />
+            </StackPanel>
+
+            <!-- forced password change -->
+            <StackPanel IsVisible="{Binding MustChangePassword}" Spacing="12">
+                <TextBlock Text="غيّر كلمة المرور" FontSize="18" FontWeight="Bold" Foreground="#0078D7" />
+                <TextBlock Text="{Binding Message}" Foreground="#D24726" TextWrapping="Wrap" />
+
+                <TextBlock Text="كلمة المرور الجديدة" FontWeight="SemiBold" />
+                <TextBox Text="{Binding NewPassword}" PasswordChar="●" />
+
+                <TextBlock Text="تأكيد كلمة المرور" FontWeight="SemiBold" />
+                <TextBox Text="{Binding ConfirmPassword}" PasswordChar="●" />
+
+                <Button Classes="primary" Content="حفظ ومتابعة"
+                        Command="{Binding ChangePasswordCommand}" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+                <Button Classes="ghost" Content="رجوع"
+                        Command="{Binding BackCommand}" HorizontalAlignment="Stretch" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.5.23" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Daftar.Domain\Daftar.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Daftar.Infrastructure\Daftar.Infrastructure.csproj" />
+    <!-- The screen view models are plain objects over the same services, so they are tested
+         here against real SQLite rather than only by clicking through the UI. -->
+    <ProjectReference Include="..\..\src\Daftar.Desktop\Daftar.Desktop.csproj" />
+  </ItemGroup>
+
+</Project>

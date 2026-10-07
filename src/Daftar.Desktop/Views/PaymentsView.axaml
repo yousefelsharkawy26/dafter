@@ -1,0 +1,115 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Daftar.ViewModels"
+             xmlns:d="http://schemas.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Daftar.Views.PaymentsView"
+             x:DataType="vm:PaymentsViewModel"
+             FlowDirection="RightToLeft">
+
+    <Grid RowDefinitions="Auto,*" Margin="16">
+
+        <!-- take the money -->
+        <Border Grid.Row="0" Classes="card" Margin="0,0,0,12">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="260,240,130,240,*,Auto" ColumnSpacing="12">
+
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Classes="muted" Text="الحركة" />
+                        <ComboBox ItemsSource="{Binding Directions}"
+                                  SelectedItem="{Binding SelectedDirection}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DirectionOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Classes="muted" Text="الطرف" />
+                        <ComboBox ItemsSource="{Binding Parties}"
+                                  SelectedItem="{Binding Party}"
+                                  PlaceholderText="اختار">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PartyOption">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Spacing="2">
+                        <TextBlock Classes="muted" Text="المبلغ" />
+                        <TextBox Text="{Binding Amount}" PlaceholderText="0.00" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Spacing="2">
+                        <TextBlock Classes="muted" Text="طريقة الدفع" />
+                        <ComboBox ItemsSource="{Binding Methods}" SelectedItem="{Binding SelectedMethod}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MethodOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4" Spacing="2">
+                        <TextBlock Classes="muted" Text="الحساب اللي الفلوس هتوصله" />
+                        <ComboBox ItemsSource="{Binding Accounts}"
+                                  SelectedItem="{Binding Account}"
+                                  PlaceholderText="اختار الحساب">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AccountRow">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <Button Grid.Column="5" Classes="primary" Content="حفظ"
+                            VerticalAlignment="Bottom"
+                            IsEnabled="{Binding CanPost}"
+                            Command="{Binding PostCommand}" />
+                </Grid>
+
+                <Grid ColumnDefinitions="260,*" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Classes="muted" Text="مرجع (رقم الإيصال / الشيك)" />
+                        <TextBox Text="{Binding Reference}" PlaceholderText="اختياري" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Classes="muted" Text="{Binding Outstanding}" />
+                        <TextBlock Classes="muted" Text="{Binding Status}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- what has been paid and received -->
+        <Border Grid.Row="1" Classes="card">
+            <StackPanel Spacing="10">
+                <TextBlock Classes="heading" Text="سجل المقبوضات والمدفوعات" />
+                <DataGrid ItemsSource="{Binding Recent}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="رقم" Binding="{Binding DocNo}" Width="130" />
+                        <DataGridTextColumn Header="الطرف" Binding="{Binding Party}" Width="2*" />
+                        <DataGridTextColumn Header="الحساب" Binding="{Binding Account}" Width="150" />
+                        <DataGridTextColumn Header="النوع"
+                                            Binding="{Binding DirectionLabel}" Width="100" />
+                        <DataGridTextColumn Header="طريقة الدفع"
+                                            Binding="{Binding MethodLabel}" Width="190" />
+                        <DataGridTextColumn Header="المبلغ"
+                                            Binding="{Binding AmountText}" Width="110" />
+                        <DataGridTextColumn Header="التاريخ"
+                                            Binding="{Binding DocDate, StringFormat='yyyy-MM-dd'}"
+                                            Width="110" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

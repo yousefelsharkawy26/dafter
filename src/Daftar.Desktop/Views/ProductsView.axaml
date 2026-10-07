@@ -1,0 +1,119 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Daftar.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Daftar.Views.ProductsView"
+             x:DataType="vm:ProductsViewModel"
+             FlowDirection="RightToLeft">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+    <Grid ColumnDefinitions="300,*" Margin="16">
+
+        <!-- products list + add form -->
+        <Border Grid.Column="0" Classes="card" Margin="0,0,16,0">
+            <StackPanel Spacing="10">
+
+                    <TextBlock Classes="heading" Text="الأصناف" />
+
+                    <ListBox ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct}"
+                             MaxHeight="220">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProductRow">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                    <TextBlock Classes="muted" Text="{Binding Sku}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock Classes="heading" Text="صنف جديد" Margin="0,10,0,0" />
+
+                    <TextBlock Classes="muted" Text="الكود (SKU)" />
+                    <TextBox Text="{Binding NewSku}" PlaceholderText="OLIVE-1" />
+
+                    <TextBlock Classes="muted" Text="الاسم" />
+                    <TextBox Text="{Binding NewName}" PlaceholderText="زيت زيتون" />
+
+                    <TextBlock Classes="muted" Text="وحدة الأساس" />
+                    <TextBox Text="{Binding NewBaseUnit}" PlaceholderText="piece / kg / لتر" />
+
+                    <TextBlock Classes="muted" Text="حد إعادة الطلب" />
+                    <TextBox Text="{Binding NewReorderLevel}" PlaceholderText="اختياري" />
+
+                    <Button Classes="primary" Content="إضافة الصنف"
+                            Command="{Binding AddProductCommand}" HorizontalAlignment="Stretch" />
+                </StackPanel>
+        </Border>
+
+        <!-- units and prices for the selected product -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto" RowSpacing="16">
+
+            <Border Grid.Row="0" Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="heading" Text="وحدات الصنف" />
+                    <DataGrid ItemsSource="{Binding Units}" MaxHeight="180">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="الوحدة" Binding="{Binding Name}" Width="*" />
+                            <DataGridTextColumn Header="معامل التحويل" Binding="{Binding Factor}" Width="120" />
+                            <DataGridTextColumn Header="أساس" Binding="{Binding IsBase}" Width="70" />
+                            <DataGridTextColumn Header="بيع افتراضي" Binding="{Binding IsDefaultSale}" Width="100" />
+                            <DataGridTextColumn Header="شراء افتراضي" Binding="{Binding IsDefaultPurchase}" Width="100" />
+                            <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="140" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <Grid ColumnDefinitions="*,100,Auto,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Text="{Binding UnitName}" PlaceholderText="اسم الوحدة (كرتون مثلاً)" />
+                        <TextBox Grid.Column="1" Text="{Binding UnitFactor}" PlaceholderText="الوحدات في الأساس" />
+                        <CheckBox Grid.Column="2" Content="أساس" IsChecked="{Binding UnitIsBase}" />
+                        <CheckBox Grid.Column="3" Content="بيع افتراضي" IsChecked="{Binding UnitDefaultSale}" />
+                    </Grid>
+                    <Button Content="إضافة الوحدة" Command="{Binding AddUnitCommand}"
+                            HorizontalAlignment="Left" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="1" Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="heading" Text="الأسعار" />
+                    <DataGrid ItemsSource="{Binding Prices}" MaxHeight="150">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="الوحدة" Binding="{Binding UnitName}" Width="*" />
+                            <DataGridTextColumn Header="السعر" Binding="{Binding Price}" Width="120" />
+                            <DataGridTextColumn Header="ساري من"
+                                                Binding="{Binding EffectiveFrom, StringFormat='yyyy-MM-dd'}"
+                                                Width="130" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ComboBox ItemsSource="{Binding Units}" SelectedItem="{Binding PriceUnit}"
+                                  PlaceholderText="الوحدة" MinWidth="160">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:UnitRow">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBox Text="{Binding PriceAmount}" PlaceholderText="السعر" Width="120" />
+                        <Button Content="حفظ السعر" Command="{Binding AddPriceCommand}" />
+                    </StackPanel>
+
+                    <TextBlock Classes="muted"
+                               Text="السعر بيتسجل كسطر جديد — القديم ما يتغيرش عشان الفواتير القديمة تفضل صح" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="2" Classes="card">
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="muted" Text="{Binding Status}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+    </ScrollViewer>
+</UserControl>

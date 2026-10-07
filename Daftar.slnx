@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Daftar.Desktop/Daftar.Desktop.csproj" />
+    <Project Path="src/Daftar.Infrastructure/Daftar.Infrastructure.csproj" />
+    <Project Path="src/Daftar.Domain/Daftar.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Daftar.Domain.Tests/Daftar.Domain.Tests.csproj" />
+  </Folder>
+</Solution>
