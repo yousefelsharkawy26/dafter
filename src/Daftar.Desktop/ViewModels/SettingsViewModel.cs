@@ -753,18 +753,26 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         }
     }
 
+    /// <summary>
+    /// One checkbox per code in <see cref="Role.Codes.All"/>, and that has to stay true.
+    ///
+    /// SaveRoleAsync rebuilds the permission string from these checkboxes alone, so a code with no
+    /// checkbox is silently stripped the moment anyone opens and saves a role -- which is how
+    /// Purchases.Create and Payments.Manage came to be dropped from real roles. A test pins the
+    /// correspondence so the next code added cannot repeat it.
+    /// </summary>
     private static List<PermissionCheckItem> CreateDefaultPermissionCheckItems()
     {
         return
         [
             new(Role.Codes.SalesCreate, "إنشاء فواتير البيع", "إمكانية إدخال وإصدار فواتير بيع جديدة"),
-            new(Role.Codes.SalesCancel, "إلغاء وتعديل الفواتير", "إلغاء أو تعديل الفواتير الصادرة"),
+            new(Role.Codes.PurchasesCreate, "إنشاء فواتير الشراء", "إدخال وإصدار فواتير شراء من الموردين"),
+            new(Role.Codes.PaymentsManage, "إدارة سندات القبض والدفع", "تحصيل المبالغ من العملاء ودفعها للموردين"),
             new(Role.Codes.PriceOverride, "تعديل أسعار البيع", "تغيير سعر بيع الصنف يدوياً عند البيع"),
             new(Role.Codes.StockAdjust, "تسوية المخزون", "تعديل كميات وأرصدة الأصناف في المستودع"),
             new(Role.Codes.StockScrap, "تسجيل هالك وتوالف", "إثبات تالف المخزون وتنزيله من الأرصدة"),
             new(Role.Codes.PartiesEditCredit, "تعديل حدود الائتمان", "تعديل سقف البيع الآجل للعملاء والموردين"),
             new(Role.Codes.ReportsCost, "عرض التكلفة والربحية", "الاطلاع على أرباح وتكاليف البضاعة في التقارير"),
-            new(Role.Codes.PeriodUnlock, "إلغاء قفل الفترات", "فتح فترات التوزيع والحسابات المغلقة"),
             new(Role.Codes.UsersManage, "إدارة المستخدمين", "إنشاء وتعديل حسابات المستخدمين وصلاحياتهم"),
         ];
     }

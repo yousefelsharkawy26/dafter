@@ -134,8 +134,93 @@ public sealed class PermissionEnforcementTests : IAsyncLifetime, IDisposable
 
         // The point of the whole model.
         Assert.False(await AsUserAsync(userId, a => a.CanAsync(Role.Codes.UsersManage)));
-        Assert.False(await AsUserAsync(userId, a => a.CanAsync(Role.Codes.PeriodUnlock)));
+        Assert.False(await AsUserAsync(userId, a => a.CanAsync(Role.Codes.PurchasesCreate)));
         Assert.False(await AsUserAsync(userId, a => a.CanAsync(Role.Codes.StockScrap)));
+    }
+
+    [Fact]
+    public async Task Editing_A_Role_In_The_Settings_Screen_Keeps_Every_Permission_It_Had()
+    {
+        // SaveRoleAsync rebuilds the permission string from the dialog's checkboxes and nothing
+        // else. A code in Role.Codes.All with no checkbox is therefore stripped the moment anyone
+        // opens a role and presses save -- which is how Purchases.Create and Payments.Manage
+        // disappeared from real roles right after they were added to the model.
+        var userId = await CreateUserAsync("permkeep-admin", Role.Codes.UsersManage);
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(userId);
+        try
+        {
+            int roleId;
+            using (var scope = _services.CreateScope())
+            {
+                var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+                var role = new Role
+                {
+                    Name = "FullAccess",
+                    Permissions = Role.Codes.Csv,
+                    MaxDiscountPercent = 100m,
+                };
+                ctx.Roles.Add(role);
+                await ctx.SaveChangesAsync();
+                roleId = role.Id;
+            }
+
+            var vm = new SettingsViewModel(_services);
+
+            await vm.OpenEditRoleDialogAsync(AsRoleItem(roleId, "FullAccess", 100m));
+            await vm.SaveRoleAsync();
+
+            using var verify = _services.CreateScope();
+            var db = verify.ServiceProvider.GetRequiredService<DaftarContext>();
+            var saved = await db.Roles.FindAsync(roleId);
+
+            Assert.NotNull(saved);
+            var kept = (saved.Permissions ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var code in Role.Codes.All)
+            {
+                Assert.Contains(code, kept);
+            }
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+    }
+
+    [Fact]
+    public async Task Every_Permission_Code_Has_A_Checkbox_To_Show_For_It()
+    {
+        // The correspondence itself, so the round trip above cannot pass for the wrong reason.
+        int roleId;
+        using (var scope = _services.CreateScope())
+        {
+            var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+            var role = new Role
+            {
+                Name = "Inspectable",
+                Permissions = Role.Codes.Csv,
+                MaxDiscountPercent = 0m,
+            };
+            ctx.Roles.Add(role);
+            await ctx.SaveChangesAsync();
+            roleId = role.Id;
+        }
+
+        var vm = new SettingsViewModel(_services);
+        await vm.OpenEditRoleDialogAsync(AsRoleItem(roleId, "Inspectable", 0m));
+
+        var shown = vm.RolePermissions.Select(p => p.Code).ToArray();
+
+        Assert.Equal(Role.Codes.All.Length, shown.Length);
+        foreach (var code in Role.Codes.All)
+        {
+            Assert.Contains(code, shown);
+        }
+
+        // And a code that gates nothing has no switch, so the screen cannot promise it.
+        Assert.DoesNotContain("Sales.Cancel", shown);
+        Assert.DoesNotContain("Period.Unlock", shown);
     }
 
     [Fact]
@@ -574,6 +659,10 @@ public sealed class PermissionEnforcementTests : IAsyncLifetime, IDisposable
 
         await new SalePostingService(ctx).PostAsync(sale.Id, 1, sale.DocDate);
     }
+
+    /// <summary>The list row the settings screen hands to the role dialog.</summary>
+    private static RoleListItem AsRoleItem(int id, string name, decimal maxDiscount) =>
+        new(id, name, maxDiscount, $"{maxDiscount:0.#}%", 0, string.Empty);
 
     /// <summary>One product with stock on hand, posted while nobody is signed in.</summary>
     private async Task EnsureStockAsync()

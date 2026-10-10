@@ -35,11 +35,20 @@ public sealed class Role : IAuditable, IDomainValidatable
             throw new DomainException($"Role '{Name}' has MaxDiscountPercent {MaxDiscountPercent}; must be 0..100.");
     }
 
-    /// <summary>Permission codes referenced anywhere in the application.</summary>
+    /// <summary>
+    /// Permission codes referenced anywhere in the application.
+    ///
+    /// Every code here must gate something real. Sales.Cancel and Period.Unlock used to sit in this
+    /// list with a checkbox and an Arabic description in the settings screen, and nothing in the
+    /// application checked either one: there is no code that cancels a sale and no code that locks
+    /// a period. An operator who ticked "إلغاء الفواتير" had every reason to believe invoices could
+    /// be cancelled, and nothing would have happened. They are removed rather than enforced -- a
+    /// switch that does nothing is worse than a switch that is absent. They come back when the
+    /// features do.
+    /// </summary>
     public static class Codes
     {
         public const string SalesCreate = "Sales.Create";
-        public const string SalesCancel = "Sales.Cancel";
         public const string PurchasesCreate = "Purchases.Create";
         public const string PaymentsManage = "Payments.Manage";
         public const string PriceOverride = "Price.Override";
@@ -47,13 +56,12 @@ public sealed class Role : IAuditable, IDomainValidatable
         public const string StockScrap = "Stock.Scrap";
         public const string PartiesEditCredit = "Parties.EditCredit";
         public const string ReportsCost = "Reports.Cost";
-        public const string PeriodUnlock = "Period.Unlock";
         public const string UsersManage = "Users.Manage";
 
         public static readonly string[] All =
         [
-            SalesCreate, SalesCancel, PurchasesCreate, PaymentsManage, PriceOverride,
-            StockAdjust, StockScrap, PartiesEditCredit, ReportsCost, PeriodUnlock, UsersManage,
+            SalesCreate, PurchasesCreate, PaymentsManage, PriceOverride,
+            StockAdjust, StockScrap, PartiesEditCredit, ReportsCost, UsersManage,
         ];
 
         /// <summary>
