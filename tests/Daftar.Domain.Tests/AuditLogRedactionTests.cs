@@ -184,6 +184,143 @@ public sealed class AuditLogRedactionTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task An_Update_Records_What_The_Value_Was_Before()
+    {
+        // The trail said "FullName changed" and never said what it had been. That is a log, not
+        // an account: nobody can reconstruct who was owed what, or argue the point.
+        var ctx = NewContext();
+        var role = await RoleAsync(ctx, "Manager");
+
+        var user = new User
+        {
+            Username = "auditor1",
+            FullName = "الاسم القديم",
+            PasswordHash = PasswordHasher.Hash("pw"),
+            RoleId = role.Id,
+            IsActive = true,
+        };
+        ctx.Users.Add(user);
+        await ctx.SaveChangesAsync();
+
+        user.FullName = "الاسم الجديد";
+        await ctx.SaveChangesAsync();
+
+        var audit = await ctx.AuditLogs
+            .Where(a => a.EntityName == nameof(User) && a.Action == AuditAction.Update)
+            .OrderByDescending(a => a.Id)
+            .FirstAsync();
+
+        Assert.NotNull(audit.OldValues);
+        Assert.Contains("الاسم القديم", audit.OldValues, StringComparison.Ordinal);
+        Assert.DoesNotContain("الاسم الجديد", audit.OldValues, StringComparison.Ordinal);
+
+        // And the new side still says what it became.
+        Assert.Contains("الاسم الجديد", audit.NewValues!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_Delete_Records_The_Whole_Row_It_Took_With_It()
+    {
+        // A delete has no "after". If the row is not captured on the way out, the information
+        // is simply gone -- there is no trigger and no journal to recover it from.
+        var ctx = NewContext();
+        var role = await RoleAsync(ctx, "Temp");
+
+        var user = new User
+        {
+            Username = "doomed",
+            FullName = "حساب هيتشال",
+            PasswordHash = PasswordHasher.Hash("pw"),
+            RoleId = role.Id,
+            IsActive = true,
+        };
+        ctx.Users.Add(user);
+        await ctx.SaveChangesAsync();
+
+        ctx.Users.Remove(user);
+        await ctx.SaveChangesAsync();
+
+        var audit = await ctx.AuditLogs
+            .Where(a => a.EntityName == nameof(User) && a.Action == AuditAction.Delete)
+            .OrderByDescending(a => a.Id)
+            .FirstAsync();
+
+        Assert.NotNull(audit.OldValues);
+        Assert.Contains("doomed", audit.OldValues, StringComparison.Ordinal);
+        Assert.Contains("حساب هيتشال", audit.OldValues, StringComparison.Ordinal);
+        Assert.Null(audit.NewValues);
+    }
+
+    [Fact]
+    public async Task An_Update_Keeps_The_Old_Hash_Out_Of_The_Audit_Log()
+    {
+        // Filling OldValues opened a second route to the same secret. The deny-list has to cover
+        // the original side as well, not just the current one.
+        var ctx = NewContext();
+        var role = await RoleAsync(ctx, "Rotating");
+
+        var user = new User
+        {
+            Username = "rotator",
+            FullName = "كاشير",
+            PasswordHash = PasswordHasher.Hash("first-secret"),
+            RoleId = role.Id,
+            IsActive = true,
+        };
+        ctx.Users.Add(user);
+        await ctx.SaveChangesAsync();
+
+        var oldHash = user.PasswordHash;
+        user.PasswordHash = PasswordHasher.Hash("second-secret");
+        await ctx.SaveChangesAsync();
+
+        var audit = await ctx.AuditLogs
+            .Where(a => a.EntityName == nameof(User) && a.Action == AuditAction.Update)
+            .OrderByDescending(a => a.Id)
+            .FirstAsync();
+
+        Assert.NotNull(audit.OldValues);
+        Assert.DoesNotContain("pbkdf2-sha256", audit.OldValues, StringComparison.Ordinal);
+        Assert.DoesNotContain(oldHash, audit.OldValues, StringComparison.Ordinal);
+        Assert.Contains(nameof(User.PasswordHash), audit.OldValues, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_Update_Names_What_Changed_And_Not_The_Stamp_Columns()
+    {
+        // The stamp columns are set by the interceptor itself. EF has already computed the
+        // modified set by the time SavingChanges runs, so they are not flagged as modified today
+        // and this exclusion is currently inert -- removing it changes nothing, which was checked.
+        // It stays because a future EF that re-detects after the interceptor would otherwise
+        // start writing "UpdatedAt changed, UpdatedAt changed" into every row of the trail.
+        var ctx = NewContext();
+        var role = await RoleAsync(ctx, "NoOp");
+
+        var user = new User
+        {
+            Username = "noop",
+            FullName = "كاشير",
+            PasswordHash = PasswordHasher.Hash("pw"),
+            RoleId = role.Id,
+            IsActive = true,
+        };
+        ctx.Users.Add(user);
+        await ctx.SaveChangesAsync();
+
+        user.FullName = "كاشير جديد";
+        await ctx.SaveChangesAsync();
+
+        var audit = await ctx.AuditLogs
+            .Where(a => a.EntityName == nameof(User) && a.Action == AuditAction.Update)
+            .OrderByDescending(a => a.Id)
+            .FirstAsync();
+
+        Assert.DoesNotContain(nameof(User.UpdatedAt), audit.OldValues!, StringComparison.Ordinal);
+        Assert.DoesNotContain(nameof(User.UpdatedBy), audit.OldValues!, StringComparison.Ordinal);
+        Assert.Contains(nameof(User.FullName), audit.OldValues!, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task No_Audit_Row_Anywhere_Contains_An_Actual_Hash()
     {
         var ctx = NewContext();

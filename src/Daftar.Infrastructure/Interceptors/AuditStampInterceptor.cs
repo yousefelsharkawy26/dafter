@@ -94,9 +94,22 @@ public sealed class AuditStampInterceptor(ICurrentUser currentUser) : SaveChange
             if (action is null || !IsAudited(name, entry))
                 continue;
 
-            var newValues = action == AuditAction.Insert || action == AuditAction.Update
-                ? SerializeChangedProperties(entry)
-                : null;
+            // The old side of the change. Without it the trail records that a price moved and
+            // nothing about where it moved from, which is the difference between a log and an
+            // account. A delete has no new side at all, so the whole row goes to OldValues.
+            var newValues = action switch
+            {
+                AuditAction.Insert => SerializeChanged(entry, original: false),
+                AuditAction.Update => SerializeChanged(entry, original: false),
+                _ => null,
+            };
+
+            var oldValues = action switch
+            {
+                AuditAction.Update => SerializeChanged(entry, original: true),
+                AuditAction.Delete => SerializeWholeRow(entry),
+                _ => null,
+            };
 
             _pending.Add(new AuditLog
             {
@@ -106,6 +119,7 @@ public sealed class AuditStampInterceptor(ICurrentUser currentUser) : SaveChange
                 EntityName = name,
                 EntityId = PrimaryKey(entry),
                 NewValues = newValues,
+                OldValues = oldValues,
             });
         }
 
@@ -160,20 +174,58 @@ public sealed class AuditStampInterceptor(ICurrentUser currentUser) : SaveChange
         nameof(User.PasswordHash),
     ];
 
-    private static string? SerializeChangedProperties(EntityEntry entry)
+    /// <summary>
+    /// JSON with the default encoder turns every Arabic character into a six-character escape, so
+    /// a party name comes back as unreadable noise in the audit trail. This log is read by people
+    /// looking at a name that changed, so it has to stay readable. The relaxed encoder is safe
+    /// here: nothing renders this as HTML, it is a JSON column in a local database.
+    /// </summary>
+    private static readonly JsonSerializerOptions ReadableJson = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    /// <summary>
+    /// The properties this save actually touched, taken from the current or the original side.
+    /// The stamp columns are excluded because the interceptor itself just wrote them, so they
+    /// would turn every change into "UpdatedAt changed, UpdatedAt changed".
+    /// </summary>
+    private static string? SerializeChanged(EntityEntry entry, bool original)
     {
         var changed = entry.Properties
             .Where(p => p.IsModified || entry.State == EntityState.Added)
             .Where(p => !string.Equals(p.Metadata.Name, nameof(IAuditable.UpdatedAt), StringComparison.Ordinal)
                      && !string.Equals(p.Metadata.Name, nameof(IAuditable.UpdatedBy), StringComparison.Ordinal))
-            // Record that the credential changed, not what it became.
-            .Select(p => NeverAudit.Contains(p.Metadata.Name)
-                ? new KeyValuePair<string, string>(p.Metadata.Name, "(redacted)")
-                : new KeyValuePair<string, string>(p.Metadata.Name, p.CurrentValue?.ToString() ?? "null"))
+            .Select(p => Capture(p, original))
             .ToDictionary(p => p.Key, p => p.Value);
 
         return changed.Count == 0
             ? null
-            : JsonSerializer.Serialize(changed);
+            : JsonSerializer.Serialize(changed, ReadableJson);
+    }
+
+    /// <summary>
+    /// Every property of a row on its way out. A delete has no "after" to compare against, so
+    /// the whole row is the only record of what was there.
+    /// </summary>
+    private static string? SerializeWholeRow(EntityEntry entry)
+    {
+        var all = entry.Properties
+            .Select(p => Capture(p, original: true))
+            .ToDictionary(p => p.Key, p => p.Value);
+
+        return all.Count == 0
+            ? null
+            : JsonSerializer.Serialize(all, ReadableJson);
+    }
+
+    private static KeyValuePair<string, string> Capture(PropertyEntry property, bool original)
+    {
+        // Record that the credential changed, not what it became -- and not what it was.
+        if (NeverAudit.Contains(property.Metadata.Name))
+            return new(property.Metadata.Name, "(redacted)");
+
+        var value = original ? property.OriginalValue : property.CurrentValue;
+        return new(property.Metadata.Name, value?.ToString() ?? "null");
     }
 }
