@@ -1,6 +1,7 @@
 using System;
-using System.Threading.Tasks;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Daftar.Desktop;
 using Daftar.Infrastructure;
@@ -28,6 +29,24 @@ sealed class Program
             Log("ERROR", "Unobserved task exception", e.Exception);
             e.SetObserved();
         };
+
+        // One instance per user. Two copies on one database file means two writers with no
+        // shared state: both would read the same stock balance and both would write it back,
+        // and both would hand out the same next invoice number. A mutex costs nothing and
+        // removes the whole class of problem before it starts.
+        using var singleInstance = new Mutex(
+            initiallyOwned: true,
+            name: $"Local\\Daftar-{Environment.UserName}",
+            createdNew: out var isFirstInstance);
+
+        if (!isFirstInstance)
+        {
+            StartupError.Show(
+                "دفتر مفتوح بالفعل",
+                "التطبيق شغال بالفعل في نافذة تانية." + Environment.NewLine + Environment.NewLine +
+                "اقفل النسخة التانية الأول، عشان متحصلش تضارب في الحسابات.");
+            return 2;
+        }
 
         try
         {

@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -24,6 +25,12 @@ namespace Daftar.Infrastructure.Services;
 /// A borrower has <c>_owned == null</c>, which makes its commit and rollback no-ops and stops it
 /// disposing a transaction it does not own.
 /// </para>
+/// <para>
+/// The transaction is opened at <see cref="IsolationLevel.Serializable"/>. On SQLite this is
+/// EF's strongest setting; the accompanying <c>busy_timeout</c> in the connection string makes
+/// a genuine concurrent writer wait its turn rather than failing, and the single-instance guard
+/// in the desktop composition root means two copies of the till rarely contend at all.
+/// </para>
 /// </remarks>
 public sealed class TransactionScope : IDisposable, IAsyncDisposable
 {
@@ -45,7 +52,8 @@ public sealed class TransactionScope : IDisposable, IAsyncDisposable
 
         return context.Database.CurrentTransaction is not null
             ? new TransactionScope(owned: null)
-            : new TransactionScope(await context.Database.BeginTransactionAsync(cancellationToken));
+            : new TransactionScope(await context.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken));
     }
 
     /// <summary>Commits if this scope owns the transaction; a no-op for a nested scope.</summary>

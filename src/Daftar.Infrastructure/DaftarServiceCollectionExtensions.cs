@@ -20,7 +20,6 @@ public static class DaftarServiceCollectionExtensions
         {
             options.UseSqlite(SqliteConnectionString(databasePath));
             options.AddInterceptors(provider.GetRequiredService<AuditStampInterceptor>());
-            options.EnableSensitiveDataLogging();
         });
 
         services.AddScoped<Services.PurchasePostingService>();
@@ -49,11 +48,19 @@ public static class DaftarServiceCollectionExtensions
         {
             DataSource = databasePath,
             Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadWriteCreate,
-            Cache = Microsoft.Data.Sqlite.SqliteCacheMode.Shared,
+
+            // Private cache, not Shared. Shared cache swaps SQLite's file-level locking for
+            // table-level locks between connections in the same process, which raises
+            // SQLITE_LOCKED -- an error SQLite's busy handler deliberately does NOT retry, unlike
+            // SQLITE_BUSY. With WAL the private cache is the recommended configuration anyway.
 
             // ON DELETE RESTRICT is declared in the model, so foreign keys must be enforced.
             // Microsoft.Data.Sqlite already defaults this to true; stated for the record.
             ForeignKeys = true,
+
+            // Drives busy_timeout. A second writer waits this long instead of failing instantly,
+            // which is what the till needs when a receipt posts while a report is reading.
+            DefaultTimeout = 30,
         };
 
         return builder.ToString();
