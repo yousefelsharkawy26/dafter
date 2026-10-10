@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Controls;
 using Daftar.ViewModels;
 using Avalonia.Markup.Xaml;
@@ -11,6 +12,38 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         KeyDown += OnKeyDown;
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+        {
+            vm.RequestSignOut += OnSignOut;
+
+            vm.PropertyChanged += (s, args) =>
+            {
+                if (args.PropertyName == nameof(MainWindowViewModel.IsStartMenuOpen) && vm.IsStartMenuOpen)
+                {
+                    var sv = this.FindControl<ScrollViewer>("StartMenuScrollViewer");
+                    if (sv is not null)
+                    {
+                        sv.Offset = new Avalonia.Vector(0, 0);
+                    }
+                }
+            };
+        }
+    }
+
+    private void OnSignOut()
+    {
+        if (App.Services is { } services)
+        {
+            var loginVm = services.GetRequiredService<LoginViewModel>();
+            var loginWin = new LoginWindow(loginVm);
+            loginWin.Show();
+            Close();
+        }
     }
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);

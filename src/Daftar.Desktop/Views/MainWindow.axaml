@@ -4,7 +4,7 @@
         xmlns:views="using:Daftar.Views"
         x:Class="Daftar.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Title="daftar — إدارة المخزون"
+        Title="daftar · دَفْتَر — منظومة إدارة المبيعات والمخزون"
         Icon="/Assets/avalonia-logo.ico"
         Width="1440" Height="900"
         MinWidth="1100" MinHeight="700"
@@ -14,66 +14,147 @@
     <Window.KeyBindings>
         <KeyBinding Gesture="Escape" Command="{Binding CloseStartMenuCommand}" />
         <KeyBinding Gesture="F1" Command="{Binding ToggleStartMenuCommand}" />
+        <KeyBinding Gesture="F2" Command="{Binding OpenCommand}" CommandParameter="sell" />
+        <KeyBinding Gesture="F3" Command="{Binding OpenCommand}" CommandParameter="stock" />
+        <KeyBinding Gesture="F4" Command="{Binding OpenCommand}" CommandParameter="payments" />
+        <KeyBinding Gesture="F5" Command="{Binding RefreshStatsCommand}" />
+        <KeyBinding Gesture="F9" Command="{Binding OpenCommand}" CommandParameter="reports" />
         <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseTabCommand}" CommandParameter="{Binding SelectedTab}" />
+        <KeyBinding Gesture="Ctrl+Shift+W" Command="{Binding CloseOtherTabsCommand}" />
         <KeyBinding Gesture="Ctrl+Tab" Command="{Binding FocusNextTab}" />
         <KeyBinding Gesture="Ctrl+Shift+Tab" Command="{Binding FocusPrevTab}" />
     </Window.KeyBindings>
 
     <Grid>
         <!-- ========================================================
-             WORKSPACE LAYER (DESKTOP)
+             طبقة مساحة العمل (WORKSPACE LAYER)
              ======================================================== -->
         <DockPanel LastChildFill="True">
 
-            <!-- Top bar: Windows 8 App Bar (Start button + App title + User) -->
-            <Border DockPanel.Dock="Top" Classes="app-bar" Padding="8,5">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <!-- Windows 8 Start Button -->
+            <!-- 1. شريط التطبيق العلوي الفخم (Top App Bar & Quick Launch) -->
+            <Border DockPanel.Dock="Top" Classes="app-bar" Padding="8,4">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+
+                    <!-- زر "ابدأ" الأساسي (Windows 8 Metro Start Button) -->
                     <Button Grid.Column="0" Classes="start-btn"
                             Command="{Binding ToggleStartMenuCommand}"
-                            ToolTip.Tip="شاشة البدء (Windows 8) — F1">
+                            ToolTip.Tip="شاشة البدء الرئيسية (F1)">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <!-- Windows 8 4-Pane Vector Logo -->
-                            <Path Width="18" Height="18" Stretch="Uniform" Fill="White"
+                            <Path Width="16" Height="16" Stretch="Uniform" Fill="White"
                                   Data="M0,3.44 L9.8,2.11 L9.8,11.38 L0,11.38 Z M11.16,1.93 L24,0.18 L24,11.38 L11.16,11.38 Z M0,12.62 L9.8,12.62 L9.8,21.89 L0,20.56 Z M11.16,12.62 L24,12.62 L24,23.82 L11.16,22.07 Z" />
                             <TextBlock Text="ابدأ" VerticalAlignment="Center" FontWeight="Bold" FontSize="14" Foreground="White" />
                         </StackPanel>
                     </Button>
 
-                    <!-- Breadcrumb / Active Screen Title -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" Margin="16,0">
-                        <TextBlock Text="daftar" FontWeight="Bold" FontSize="15" Foreground="#00A4EF" VerticalAlignment="Center" />
-                        <TextBlock Text="—" Foreground="#666666" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding SelectedTab.Title, FallbackValue='الرئيسية'}" Foreground="#CCCCCC" FontSize="13" VerticalAlignment="Center" />
+                    <!-- أزرار الوصول السريع للعمليات الأساسية (Quick Action Strip) -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="12,0" VerticalAlignment="Center">
+                        <Button Classes="ghost" Padding="8,5" Command="{Binding OpenCommand}" CommandParameter="sell" ToolTip.Tip="نقطة البيع (F2)">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="🛒" FontSize="13" />
+                                <TextBlock Text="البيع" FontSize="12" FontWeight="SemiBold" Foreground="#E0E0E0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="ghost" Padding="8,5" Command="{Binding OpenCommand}" CommandParameter="stock" ToolTip.Tip="المخزون والأرصدة (F3)">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="📦" FontSize="13" />
+                                <TextBlock Text="المخزون" FontSize="12" FontWeight="SemiBold" Foreground="#E0E0E0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="ghost" Padding="8,5" Command="{Binding OpenCommand}" CommandParameter="payments" ToolTip.Tip="الخزينة والمدفوعات (F4)">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="💵" FontSize="13" />
+                                <TextBlock Text="الخزينة" FontSize="12" FontWeight="SemiBold" Foreground="#E0E0E0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="ghost" Padding="8,5" Command="{Binding OpenCommand}" CommandParameter="reports" ToolTip.Tip="التقارير المالية (F9)">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="📈" FontSize="13" />
+                                <TextBlock Text="التقارير" FontSize="12" FontWeight="SemiBold" Foreground="#E0E0E0" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
 
-                    <!-- User and Actions -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding CurrentUserName}" Foreground="#E0E0E0" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        <Button Classes="ghost" Content="إغلاق التبويبات"
-                                Command="{Binding CloseOtherTabsCommand}" />
+                    <!-- مسار الصفحة والاسم (Breadcrumb) -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0">
+                        <TextBlock Text="daftar" FontWeight="Bold" FontSize="14" Foreground="#00A4EF" VerticalAlignment="Center" />
+                        <TextBlock Text="›" Foreground="#666666" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding SelectedTab.Icon, FallbackValue='🏠'}" FontSize="13" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding SelectedTab.Title, FallbackValue='شاشة ابدأ'}" Foreground="#D0D0D0" FontSize="13" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- أدوات التحكم والمستخدم وتسجيل الخروج (User Profile & Window Tools) -->
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <!-- زر التحديث الفوري -->
+                        <Button Classes="ghost" Padding="8,5" Command="{Binding RefreshStatsCommand}" ToolTip.Tip="تحديث المؤشرات والبيانات (F5)">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="🔄" FontSize="12" />
+                                <TextBlock Text="تحديث" FontSize="11" Foreground="#CCCCCC" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- إغلاق التبويبات الأخرى -->
+                        <Button Classes="ghost" Padding="8,5" Command="{Binding CloseOtherTabsCommand}" ToolTip.Tip="إغلاق باقي التبويبات (Ctrl+Shift+W)">
+                            <TextBlock Text="إغلاق التبويبات" FontSize="11" Foreground="#CCCCCC" />
+                        </Button>
+
+                        <!-- فاصل ناعم -->
+                        <Border Width="1" Height="20" Background="#444444" Margin="2,0" />
+
+                        <!-- بطاقة المستخدم وتسجيل الخروج -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Border Width="28" Height="28" Background="#0078D7" CornerRadius="14">
+                                <TextBlock Text="👤" FontSize="12" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="{Binding CurrentUserName}" Foreground="#E0E0E0" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                            <!-- زر تسجيل الخروج / قفل الشاشة -->
+                            <Button Classes="ghost" Padding="8,4" Command="{Binding SignOutCommand}" ToolTip.Tip="تسجيل الخروج والعودة لشاشة الدخول">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <TextBlock Text="🚪" FontSize="12" />
+                                    <TextBlock Text="خروج" FontSize="11" Foreground="#FF9999" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- Status bar -->
-            <Border DockPanel.Dock="Bottom" Classes="status" BorderBrush="#D0D0D0" BorderThickness="0,1,0,0"
-                    Padding="12,5">
-                <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#666666" />
+            <!-- 2. شريط الحالة السفلي التفاعلي (Interactive Status Bar) -->
+            <Border DockPanel.Dock="Bottom" Classes="status" BorderBrush="#D0D0D0" BorderThickness="0,1,0,0" Padding="12,5">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <!-- الحالة الحية الحالية -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="🟢" FontSize="9" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#444444" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- دليل اختصارات لوحة المفاتيح المباشر -->
+                    <TextBlock Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Text="[F1] ابدأ  ·  [F2] بيع  ·  [F3] مخزون  ·  [F4] خزينة  ·  [F5] تحديث  ·  [Ctrl+W] إغلاق التبويب"
+                               FontSize="11" Foreground="#777777" />
+
+                    <!-- معلومات النظام والاتصال والتبويبات المفتوحة -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Tabs.Count, StringFormat='التبويبات المفتوحة: {0}'}" FontSize="11" Foreground="#666666" />
+                        <TextBlock Text="قاعدة البيانات: متصلة (SQLite)" FontSize="11" Foreground="#0078D7" />
+                        <TextBlock Text="{Binding CurrentDateText}" FontSize="11" Foreground="#666666" />
+                    </StackPanel>
+                </Grid>
             </Border>
 
-            <!-- Open pages TabControl -->
+            <!-- 3. مساحة التبويبات النشطة (Active Tabs View) -->
             <TabControl Classes="tabs"
                         ItemsSource="{Binding Tabs}"
                         SelectedItem="{Binding SelectedTab}">
                 <TabControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:TabViewModel">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Icon}" FontSize="13" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Title}" FontSize="13" VerticalAlignment="Center" />
                             <Button Classes="tab-close" Content="✕"
                                     IsVisible="{Binding CanClose}"
                                     Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CloseTabCommand}"
-                                    CommandParameter="{Binding}" />
+                                    CommandParameter="{Binding}"
+                                    Margin="4,0,0,0" ToolTip.Tip="إغلاق التبويب (Ctrl+W)" />
                         </StackPanel>
                     </DataTemplate>
                 </TabControl.ItemTemplate>
@@ -87,75 +168,271 @@
         </DockPanel>
 
         <!-- ========================================================
-             WINDOWS 8 START SCREEN (OVERLAY)
+             شاشة ابدأ المتقدمة (WINDOWS 8 METRO START SCREEN OVERLAY)
              ======================================================== -->
         <Grid IsVisible="{Binding IsStartMenuOpen}">
             <Grid.Background>
                 <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                    <GradientStop Color="#09253D" Offset="0" />
-                    <GradientStop Color="#0D3B61" Offset="1" />
+                    <GradientStop Color="#081C30" Offset="0" />
+                    <GradientStop Color="#0B2A48" Offset="0.5" />
+                    <GradientStop Color="#0D3558" Offset="1" />
                 </LinearGradientBrush>
             </Grid.Background>
 
             <DockPanel LastChildFill="True">
 
                 <!-- Start Screen Header -->
-                <Border DockPanel.Dock="Top" Padding="36,20,36,12">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
+                <Border DockPanel.Dock="Top" Padding="36,18,36,12">
+                    <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+
                         <!-- Big Windows 8 Title: ابدأ -->
-                        <TextBlock Grid.Column="0" Text="ابدأ" FontSize="44" FontWeight="Light"
+                        <TextBlock Grid.Column="0" Text="ابدأ" FontSize="42" FontWeight="Light"
                                    Foreground="White" VerticalAlignment="Center" />
 
+                        <!-- Greeting & Date -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="24,0,0,0" Spacing="2">
+                            <TextBlock Text="{Binding Greeting}" FontSize="16" FontWeight="SemiBold" Foreground="#85CAFF" />
+                            <TextBlock Text="{Binding CurrentDateText}" FontSize="12" Foreground="#D0E8FF" />
+                        </StackPanel>
+
+                        <!-- Live Search Bar -->
+                        <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBox Width="320" Height="36"
+                                     Text="{Binding SearchQuery}"
+                                     PlaceholderText="ابحث في الأقسام والعمليات... 🔍"
+                                     FontSize="13" />
+                        </StackPanel>
+
                         <!-- User Profile and Back Button -->
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
                             <!-- Avatar Circle -->
-                            <Border Width="36" Height="36" Background="#0078D7" CornerRadius="18">
-                                <TextBlock Text="👤" FontSize="16" Foreground="White"
+                            <Border Width="34" Height="34" Background="#0078D7" CornerRadius="17">
+                                <TextBlock Text="👤" FontSize="15" Foreground="White"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
 
-                            <TextBlock Text="{Binding CurrentUserName}" FontSize="15" FontWeight="SemiBold"
+                            <TextBlock Text="{Binding CurrentUserName}" FontSize="14" FontWeight="SemiBold"
                                        Foreground="White" VerticalAlignment="Center" />
 
                             <!-- Close / Back to Workspace Button -->
-                            <Button Classes="ghost" Padding="14,6" Margin="10,0,0,0"
+                            <Button Classes="ghost" Padding="14,6" Margin="8,0,0,0"
                                     Command="{Binding CloseStartMenuCommand}"
+                                    IsVisible="{Binding HasOpenTabs}"
                                     ToolTip.Tip="الرجوع إلى نافذة العمل (Esc)">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <TextBlock Text="⮌" Foreground="White" FontWeight="Bold" />
                                     <TextBlock Text="الرجوع للعمل" Foreground="White" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
+
+                            <!-- Sign Out Button on Start Screen -->
+                            <Button Classes="ghost" Padding="10,6" Command="{Binding SignOutCommand}" ToolTip.Tip="تسجيل الخروج">
+                                <TextBlock Text="🚪 خروج" Foreground="#FF9999" FontWeight="SemiBold" />
+                            </Button>
                         </StackPanel>
                     </Grid>
                 </Border>
 
-                <!-- Start Screen Body: Horizontal Scrollable Live Tile Groups -->
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                <!-- Start Screen Body: Horizontal Scrollable Live Figures & Tile Groups -->
+                <ScrollViewer x:Name="StartMenuScrollViewer"
+                              HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                               Padding="36,6,36,36">
-                    <StackPanel Orientation="Horizontal" Spacing="42">
+                    <StackPanel Orientation="Horizontal" Spacing="36">
 
-                        <!-- Group 1: العمليات اليومية -->
+                        <!-- ========================================================
+                             المجموعة 0: نبض اليوم والمؤشرات الحية (Figures & Live Feed)
+                             ======================================================== -->
                         <StackPanel Spacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Width="4" Height="20" Background="#00A4EF" />
+                                <TextBlock Text="نبض اليوم والمؤشرات الحية" FontSize="18" FontWeight="SemiBold"
+                                           Foreground="#70C5FF" Margin="0,0,0,2" />
+                                <Border Background="#E51400" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="مباشر 🔴" FontSize="10" FontWeight="Bold" Foreground="White" />
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Spacing="8">
+                                <!-- Row 1: Major Financial Figures -->
+                                <WrapPanel Orientation="Horizontal" Width="560">
+
+                                    <!-- Figure 1: Hero Sales Figure -->
+                                    <Button Classes="start-tile" Background="#005A9E" Width="265" Height="130" Margin="4"
+                                            Command="{Binding OpenCommand}" CommandParameter="sell"
+                                            ToolTip.Tip="انقر لفتح نقطة البيع (F2)">
+                                        <DockPanel LastChildFill="True">
+                                            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0" Text="مبيعات اليوم" FontSize="14" Foreground="#B0D6FF" FontWeight="SemiBold" />
+                                                <TextBlock Grid.Column="1" Text="🛒" FontSize="18" />
+                                            </Grid>
+                                            <StackPanel DockPanel.Dock="Bottom" Spacing="2">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="{Binding Stats.TodaySales, FallbackValue='0.00'}"
+                                                               FontSize="26" FontWeight="Bold" Foreground="White" />
+                                                    <TextBlock Text="ج.م" FontSize="13" Foreground="#C8E4FF" VerticalAlignment="Bottom" Margin="0,0,0,3" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Stats.TodaySalesCount, FallbackValue='0', StringFormat='عدد الفواتير: {0} فاتورة'}"
+                                                           FontSize="11" Foreground="#C8E4FF" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+
+                                    <!-- Figure 2: Cash Inflow -->
+                                    <Button Classes="start-tile" Background="#008A00" Width="265" Height="130" Margin="4"
+                                            Command="{Binding OpenCommand}" CommandParameter="payments"
+                                            ToolTip.Tip="انقر لفتح الخزينة والمقبوضات (F4)">
+                                        <DockPanel LastChildFill="True">
+                                            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0" Text="التحصيل والسيولة" FontSize="14" Foreground="#C8F2C8" FontWeight="SemiBold" />
+                                                <TextBlock Grid.Column="1" Text="💵" FontSize="18" />
+                                            </Grid>
+                                            <StackPanel DockPanel.Dock="Bottom" Spacing="2">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="{Binding Stats.TodayCash, FallbackValue='0.00'}"
+                                                               FontSize="26" FontWeight="Bold" Foreground="White" />
+                                                    <TextBlock Text="ج.م" FontSize="13" Foreground="#C8F2C8" VerticalAlignment="Bottom" Margin="0,0,0,3" />
+                                                </StackPanel>
+                                                <TextBlock Text="النقدية المحصلة فعلياً اليوم" FontSize="11" Foreground="#C8F2C8" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+
+                                    <!-- Figure 3: Net Financial Position -->
+                                    <Button Classes="start-tile" Background="#6B0096" Width="265" Height="130" Margin="4"
+                                            Command="{Binding OpenCommand}" CommandParameter="reports"
+                                            ToolTip.Tip="انقر لفتح التقارير المالية (F9)">
+                                        <DockPanel LastChildFill="True">
+                                            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0" Text="صافي المركز (لك - عليك)" FontSize="14" Foreground="#E8C8FF" FontWeight="SemiBold" />
+                                                <TextBlock Grid.Column="1" Text="⚖️" FontSize="18" />
+                                            </Grid>
+                                            <StackPanel DockPanel.Dock="Bottom" Spacing="2">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="{Binding Stats.NetPosition, FallbackValue='0.00'}"
+                                                               FontSize="24" FontWeight="Bold" Foreground="White" />
+                                                    <TextBlock Text="ج.م" FontSize="12" Foreground="#E8C8FF" VerticalAlignment="Bottom" Margin="0,0,0,3" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Stats.TotalPayables, FallbackValue='0.00', StringFormat='علينا للموردين: {0}'}"
+                                                           FontSize="11" Foreground="#E8C8FF" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+
+                                    <!-- Figure 4: Receivables & Overdue -->
+                                    <Button Classes="start-tile" Background="#D24726" Width="265" Height="110" Margin="4"
+                                            Command="{Binding OpenCommand}" CommandParameter="parties"
+                                            ToolTip.Tip="انقر لإدارة العملاء والديون">
+                                        <DockPanel LastChildFill="True">
+                                            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0" Text="مستحقات العملاء" FontSize="13" Foreground="#FFE0D6" FontWeight="SemiBold" />
+                                                <TextBlock Grid.Column="1" Text="👥" FontSize="16" />
+                                            </Grid>
+                                            <StackPanel DockPanel.Dock="Bottom" Spacing="2">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <TextBlock Text="{Binding Stats.TotalReceivables, FallbackValue='0.00'}"
+                                                               FontSize="21" FontWeight="Bold" Foreground="White" />
+                                                    <TextBlock Text="ج.م" FontSize="12" Foreground="#FFE0D6" VerticalAlignment="Bottom" Margin="0,0,0,3" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Stats.TotalOverdue, FallbackValue='0.00', StringFormat='متأخرات: {0}'}"
+                                                           FontSize="11" Foreground="#FFE0D6" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+
+                                    <!-- Figure 5: Low Stock Warning -->
+                                    <Button Classes="start-tile" Background="#E51400" Width="265" Height="110" Margin="4"
+                                            Command="{Binding OpenCommand}" CommandParameter="stock"
+                                            ToolTip.Tip="انقر لمراجعة نواقص المخزون (F3)">
+                                        <DockPanel LastChildFill="True">
+                                            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0" Text="تنبيهات النواقص" FontSize="13" Foreground="#FFD0D0" FontWeight="SemiBold" />
+                                                <TextBlock Grid.Column="1" Text="⚠️" FontSize="16" />
+                                            </Grid>
+                                            <StackPanel DockPanel.Dock="Bottom" Spacing="2">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="{Binding Stats.LowStockCount, FallbackValue='0'}"
+                                                               FontSize="22" FontWeight="Bold" Foreground="White" />
+                                                    <TextBlock Text="أصناف" FontSize="13" Foreground="#FFD0D0" VerticalAlignment="Bottom" Margin="0,0,0,3" />
+                                                </StackPanel>
+                                                <TextBlock Text="وصلت لحد إعادة الطلب" FontSize="11" Foreground="#FFD0D0" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+
+                                    <!-- Figure 6: Quick Reports Launcher -->
+                                    <Button Classes="start-tile" Background="#008272" Width="265" Height="110" Margin="4"
+                                            Command="{Binding OpenCommand}" CommandParameter="reports"
+                                            ToolTip.Tip="استعراض التقارير التفصيلية (F9)">
+                                        <DockPanel LastChildFill="True">
+                                            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0" Text="التقارير التحليلية" FontSize="13" Foreground="#D0FFF8" FontWeight="SemiBold" />
+                                                <TextBlock Grid.Column="1" Text="📊" FontSize="16" />
+                                            </Grid>
+                                            <StackPanel DockPanel.Dock="Bottom" Spacing="2">
+                                                <TextBlock Text="تحليل الأرباح والسيولة" FontSize="14" FontWeight="Bold" Foreground="White" />
+                                                <TextBlock Text="كشوف الحسابات وميزان المراجعة" FontSize="11" Foreground="#D0FFF8" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+
+                                </WrapPanel>
+
+                                <!-- Row 2: Live Activity / News Feed Ticker -->
+                                <Border Background="#142B40" Width="540" Padding="14,10"
+                                        BorderBrush="#1E476B" BorderThickness="1">
+                                    <StackPanel>
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="⚡" FontSize="14" Foreground="#FFD700" />
+                                                <TextBlock Text="شريط الفواتير الحية (آخر العمليات)" FontSize="13" FontWeight="Bold" Foreground="#85CAFF" />
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Classes="ghost" Padding="6,2" FontSize="11"
+                                                    Command="{Binding OpenCommand}" CommandParameter="reports"
+                                                    Content="عرض كل الفواتير ←" />
+                                        </Grid>
+
+                                        <!-- Horizontal ItemsControl of Recent Sales as News Badges -->
+                                        <ItemsControl ItemsSource="{Binding Stats.RecentSales}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:RecentSaleRow">
+                                                    <Border Background="#091B2C" BorderBrush="#163957" BorderThickness="1"
+                                                            Padding="10,6" Margin="0,0,8,6" MinWidth="185">
+                                                        <StackPanel Spacing="3">
+                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                <TextBlock Grid.Column="0" Text="{Binding DocNo}" FontSize="12" FontWeight="Bold" Foreground="#4DB3FF" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding Total, StringFormat='{}{0:N2} ج.م'}" FontSize="12" FontWeight="SemiBold" Foreground="#A0FFA0" FlowDirection="LeftToRight" />
+                                                            </Grid>
+                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                <TextBlock Grid.Column="0" Text="{Binding Customer}" FontSize="11" Foreground="#CCCCCC" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding Margin, StringFormat='ربح: {0:N2}'}" FontSize="10" Foreground="#FFD280" FlowDirection="LeftToRight" />
+                                                            </Grid>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- ========================================================
+                             المجموعة 1: العمليات اليومية
+                             ======================================================== -->
+                        <StackPanel>
                             <TextBlock Text="العمليات اليومية" FontSize="18" FontWeight="SemiBold"
                                        Foreground="#70C5FF" Margin="4,0,0,2" />
 
-                            <WrapPanel Orientation="Horizontal" Width="560">
-                                <!-- الرئيسية (Dashboard) - Wide -->
-                                <Button Classes="start-tile" Background="#008A00" Width="270" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="dashboard">
-                                    <DockPanel LastChildFill="True">
-                                        <TextBlock DockPanel.Dock="Top" Text="📊" FontSize="26" Foreground="White" />
-                                        <StackPanel DockPanel.Dock="Bottom">
-                                            <TextBlock Text="الرئيسية" FontSize="18" FontWeight="Bold" Foreground="White" />
-                                            <TextBlock Text="لوحة التحكم ومؤشرات اليوم" FontSize="12" Foreground="#D0FFFFFF" />
-                                        </StackPanel>
-                                    </DockPanel>
-                                </Button>
-
+                            <WrapPanel Orientation="Horizontal" Width="408">
                                 <!-- البيع (Point of Sale) - Wide -->
                                 <Button Classes="start-tile" Background="#0078D7" Width="270" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="sell">
+                                        Command="{Binding OpenCommand}" CommandParameter="sell" ToolTip.Tip="فاتورة بيع جديدة (F2)">
                                     <DockPanel LastChildFill="True">
                                         <TextBlock DockPanel.Dock="Top" Text="🛒" FontSize="26" Foreground="White" />
                                         <StackPanel DockPanel.Dock="Bottom">
@@ -167,7 +444,7 @@
 
                                 <!-- الاستلام (Receive) - Square -->
                                 <Button Classes="start-tile" Background="#008272" Width="131" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="receive">
+                                        Command="{Binding OpenCommand}" CommandParameter="receive" ToolTip.Tip="استلام فاتورة مورد وتكلفة الوارد">
                                     <DockPanel LastChildFill="True">
                                         <TextBlock DockPanel.Dock="Top" Text="📥" FontSize="24" Foreground="White" />
                                         <StackPanel DockPanel.Dock="Bottom">
@@ -179,7 +456,7 @@
 
                                 <!-- المرتجعات (Returns) - Square -->
                                 <Button Classes="start-tile" Background="#D24726" Width="131" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="returns">
+                                        Command="{Binding OpenCommand}" CommandParameter="returns" ToolTip.Tip="مرتجع عميل وتالف">
                                     <DockPanel LastChildFill="True">
                                         <TextBlock DockPanel.Dock="Top" Text="🔄" FontSize="24" Foreground="White" />
                                         <StackPanel DockPanel.Dock="Bottom">
@@ -189,29 +466,43 @@
                                     </DockPanel>
                                 </Button>
 
+                                <!-- الموزعين (Distributors) - Square -->
+                                <Button Classes="start-tile" Background="#A4005B" Width="131" Height="120" Margin="4"
+                                        Command="{Binding OpenCommand}" CommandParameter="sessions" ToolTip.Tip="تسوية جولة الموزع">
+                                    <DockPanel LastChildFill="True">
+                                        <TextBlock DockPanel.Dock="Top" Text="🚚" FontSize="24" Foreground="White" />
+                                        <StackPanel DockPanel.Dock="Bottom">
+                                            <TextBlock Text="الموزعين" FontSize="16" FontWeight="Bold" Foreground="White" />
+                                            <TextBlock Text="تسوية جولة الموزع" FontSize="11" Foreground="#D0FFFFFF" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Button>
+
                                 <!-- المقبوضات (Payments) - Wide -->
-                                <Button Classes="start-tile" Background="#107C10" Width="270" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="payments">
+                                <Button Classes="start-tile" Background="#107C10" Width="131" Height="120" Margin="4"
+                                        Command="{Binding OpenCommand}" CommandParameter="payments" ToolTip.Tip="تحصيل من العملاء ودفع للموردين (F4)">
                                     <DockPanel LastChildFill="True">
                                         <TextBlock DockPanel.Dock="Top" Text="💵" FontSize="26" Foreground="White" />
                                         <StackPanel DockPanel.Dock="Bottom">
                                             <TextBlock Text="المقبوضات والخزينة" FontSize="17" FontWeight="Bold" Foreground="White" />
-                                            <TextBlock Text="تحصيل من العملاء ودفع للموردين" FontSize="11" Foreground="#D0FFFFFF" />
+                                            <TextBlock Text="تحصيل ودفع" FontSize="11" Foreground="#D0FFFFFF" />
                                         </StackPanel>
                                     </DockPanel>
                                 </Button>
                             </WrapPanel>
                         </StackPanel>
 
-                        <!-- Group 2: المنتجات والمخزون -->
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="المنتجات والمخزون" FontSize="18" FontWeight="SemiBold"
+                        <!-- ========================================================
+                             المجموعة 2: المنتجات والمخزون
+                             ======================================================== -->
+                        <StackPanel>
+                            <TextBlock Text="المخزون والإعدادات" FontSize="18" FontWeight="SemiBold"
                                        Foreground="#70C5FF" Margin="4,0,0,2" />
 
-                            <WrapPanel Orientation="Horizontal" Width="560">
+                            <WrapPanel Orientation="Horizontal" Width="408">
                                 <!-- المنتجات (Products) - Wide -->
                                 <Button Classes="start-tile" Background="#6B0096" Width="270" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="products">
+                                        Command="{Binding OpenCommand}" CommandParameter="products" ToolTip.Tip="إضافة وتعديل الأصناف ووحداتها">
                                     <DockPanel LastChildFill="True">
                                         <TextBlock DockPanel.Dock="Top" Text="📦" FontSize="26" Foreground="White" />
                                         <StackPanel DockPanel.Dock="Bottom">
@@ -223,7 +514,7 @@
 
                                 <!-- المخزون (Stock) - Square -->
                                 <Button Classes="start-tile" Background="#0050EF" Width="131" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="stock">
+                                        Command="{Binding OpenCommand}" CommandParameter="stock" ToolTip.Tip="أرصدة الأصناف ومستويات الأمان (F3)">
                                     <DockPanel LastChildFill="True">
                                         <TextBlock DockPanel.Dock="Top" Text="🏢" FontSize="24" Foreground="White" />
                                         <StackPanel DockPanel.Dock="Bottom">
@@ -235,7 +526,7 @@
 
                                 <!-- الأطراف (Parties) - Square -->
                                 <Button Classes="start-tile" Background="#00A4EF" Width="131" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="parties">
+                                        Command="{Binding OpenCommand}" CommandParameter="parties" ToolTip.Tip="العملاء والموردون">
                                     <DockPanel LastChildFill="True">
                                         <TextBlock DockPanel.Dock="Top" Text="👥" FontSize="24" Foreground="White" />
                                         <StackPanel DockPanel.Dock="Bottom">
@@ -244,54 +535,22 @@
                                         </StackPanel>
                                     </DockPanel>
                                 </Button>
-                            </WrapPanel>
-                        </StackPanel>
-
-                        <!-- Group 3: التوزيع والإدارة -->
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="التوزيع والإدارة" FontSize="18" FontWeight="SemiBold"
-                                       Foreground="#70C5FF" Margin="4,0,0,2" />
-
-                            <WrapPanel Orientation="Horizontal" Width="560">
-                                <!-- الموزعين (Distributors) - Square -->
-                                <Button Classes="start-tile" Background="#A4005B" Width="131" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="distributors">
-                                    <DockPanel LastChildFill="True">
-                                        <TextBlock DockPanel.Dock="Top" Text="🚚" FontSize="24" Foreground="White" />
-                                        <StackPanel DockPanel.Dock="Bottom">
-                                            <TextBlock Text="الموزعين" FontSize="16" FontWeight="Bold" Foreground="White" />
-                                            <TextBlock Text="المركبات والحسابات" FontSize="11" Foreground="#D0FFFFFF" />
-                                        </StackPanel>
-                                    </DockPanel>
-                                </Button>
-
-                                <!-- الجولات (Sessions) - Square -->
-                                <Button Classes="start-tile" Background="#595959" Width="131" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="sessions">
-                                    <DockPanel LastChildFill="True">
-                                        <TextBlock DockPanel.Dock="Top" Text="⏱" FontSize="24" Foreground="White" />
-                                        <StackPanel DockPanel.Dock="Bottom">
-                                            <TextBlock Text="الجولات" FontSize="16" FontWeight="Bold" Foreground="White" />
-                                            <TextBlock Text="تسوية جولة الموزع" FontSize="11" Foreground="#D0FFFFFF" />
-                                        </StackPanel>
-                                    </DockPanel>
-                                </Button>
 
                                 <!-- التقارير (Reports) - Wide -->
-                                <Button Classes="start-tile" Background="#FA6800" Width="270" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="reports">
+                                <Button Classes="start-tile" Background="#FA6800" Width="131" Height="120" Margin="4"
+                                        Command="{Binding OpenCommand}" CommandParameter="reports" ToolTip.Tip="التقارير المالية والأرباح (F9)">
                                     <DockPanel LastChildFill="True">
                                         <TextBlock DockPanel.Dock="Top" Text="📈" FontSize="26" Foreground="White" />
                                         <StackPanel DockPanel.Dock="Bottom">
                                             <TextBlock Text="التقارير المالية" FontSize="17" FontWeight="Bold" Foreground="White" />
-                                            <TextBlock Text="الأرباح والتحصيلات والمتأخرات" FontSize="11" Foreground="#D0FFFFFF" />
+                                            <TextBlock Text="الأرباح والتحصيلات" FontSize="11" Foreground="#D0FFFFFF" />
                                         </StackPanel>
                                     </DockPanel>
                                 </Button>
 
                                 <!-- الإعدادات (Settings) - Wide -->
-                                <Button Classes="start-tile" Background="#4E5359" Width="270" Height="120" Margin="4"
-                                        Command="{Binding OpenCommand}" CommandParameter="settings">
+                                <Button Classes="start-tile" Background="#4E5359" Width="131" Height="120" Margin="4"
+                                        Command="{Binding OpenCommand}" CommandParameter="settings" ToolTip.Tip="بيانات الشركة والصلاحيات">
                                     <DockPanel LastChildFill="True">
                                         <TextBlock DockPanel.Dock="Top" Text="⚙" FontSize="26" Foreground="White" />
                                         <StackPanel DockPanel.Dock="Bottom">

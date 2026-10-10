@@ -1,0 +1,419 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Daftar.ViewModels"
+             x:Class="Daftar.Views.ReportsView"
+             x:DataType="vm:ReportsViewModel"
+             FlowDirection="RightToLeft">
+
+    <Grid RowDefinitions="Auto,Auto,*" Margin="16">
+
+        <!-- ========================================================
+             1. Header & Date Range Controls Bar
+             ======================================================== -->
+        <Border Grid.Row="0" Classes="panel" Margin="0,0,0,12" Padding="16,12">
+            <StackPanel Spacing="10">
+                <!-- Top Row: Page Title + Refresh & Status -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="التقارير ولوحة التحليلات المالية" Classes="subtitle" FontWeight="Bold" />
+                        <TextBlock Text="تحليل شامل للمبيعات، الأرباح، الأصناف الأكثر طلباً، حركة السيولة، وأعمار الديون" Classes="caption muted" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="90" Height="4" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding StatusMessage}" Classes="caption muted" VerticalAlignment="Center" />
+                        <Button Classes="accent" Command="{Binding LoadCommand}" IsEnabled="{Binding !IsBusy}" Padding="16,8">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="🔄" FontSize="13" VerticalAlignment="Center" />
+                                <TextBlock Text="تحديث التقرير" FontWeight="Bold" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Rectangle Height="1" Fill="{DynamicResource ControlStrokeColorDefaultBrush}" />
+
+                <!-- Date Range Bar: Quick Presets + Manual Inputs -->
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" VerticalAlignment="Center">
+                    <!-- Presets Chips -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button Classes="tab-btn" Classes.accent="{Binding IsPresetTodayActive}"
+                                Command="{Binding SetPresetTodayCommand}" Content="اليوم" Padding="12,6" />
+                        <Button Classes="tab-btn" Classes.accent="{Binding IsPresetYesterdayActive}"
+                                Command="{Binding SetPresetYesterdayCommand}" Content="أمس" Padding="12,6" />
+                        <Button Classes="tab-btn" Classes.accent="{Binding IsPresetThisWeekActive}"
+                                Command="{Binding SetPresetThisWeekCommand}" Content="هذا الأسبوع" Padding="12,6" />
+                        <Button Classes="tab-btn" Classes.accent="{Binding IsPresetThisMonthActive}"
+                                Command="{Binding SetPresetThisMonthCommand}" Content="هذا الشهر" Padding="12,6" />
+                        <Button Classes="tab-btn" Classes.accent="{Binding IsPresetLast30DaysActive}"
+                                Command="{Binding SetPresetLast30DaysCommand}" Content="آخر 30 يوم" Padding="12,6" />
+                        <Button Classes="tab-btn" Classes.accent="{Binding IsPresetThisYearActive}"
+                                Command="{Binding SetPresetThisYearCommand}" Content="هذا العام" Padding="12,6" />
+                    </StackPanel>
+
+                    <!-- Spacer -->
+                    <Panel Grid.Column="1" />
+
+                    <!-- Date Inputs -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="الفترة من:" Classes="caption muted" VerticalAlignment="Center" />
+                        <TextBox Text="{Binding FromDate, Mode=TwoWay}" Width="120" Height="34"
+                                 PlaceholderText="yyyy-MM-dd" VerticalContentAlignment="Center" />
+                        <TextBlock Text="إلى:" Classes="caption muted" VerticalAlignment="Center" />
+                        <TextBox Text="{Binding ToDate, Mode=TwoWay}" Width="120" Height="34"
+                                 PlaceholderText="yyyy-MM-dd" VerticalContentAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ========================================================
+             2. KPI Summary Strip (5 Modern Metric Cards)
+             ======================================================== -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="12" Margin="0,0,0,12">
+
+            <!-- Card 1: Sales -->
+            <Border Grid.Column="0" Classes="panel" Padding="14,12">
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="إجمالي المبيعات" Classes="caption muted" />
+                        <TextBlock Grid.Column="1" Text="📊" FontSize="14" Opacity="0.7" />
+                    </Grid>
+                    <TextBlock Text="{Binding TotalSalesText}" Classes="subtitle" FontWeight="Bold"
+                               Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
+                    <TextBlock Text="{Binding InvoicesCountText}" Classes="caption muted" />
+                </StackPanel>
+            </Border>
+
+            <!-- Card 2: Cost of Goods -->
+            <Border Grid.Column="1" Classes="panel" Padding="14,12">
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="تكلفة البضاعة المباعة" Classes="caption muted" />
+                        <TextBlock Grid.Column="1" Text="📦" FontSize="14" Opacity="0.7" />
+                    </Grid>
+                    <TextBlock Text="{Binding TotalCostText}" Classes="subtitle" FontWeight="Bold" />
+                    <TextBlock Text="تكلفة المنتجات من المخزن" Classes="caption muted" />
+                </StackPanel>
+            </Border>
+
+            <!-- Card 3: Net Margin & Profit -->
+            <Border Grid.Column="2" Classes="panel" Padding="14,12">
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="صافي أرباح المبيعات" Classes="caption muted" />
+                        <TextBlock Grid.Column="1" Text="💰" FontSize="14" Opacity="0.7" />
+                    </Grid>
+                    <TextBlock Text="{Binding TotalMarginText}" Classes="subtitle" FontWeight="Bold" Foreground="#107C41" />
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Border Classes="badge success">
+                            <TextBlock Text="{Binding MarginPercentText}" />
+                        </Border>
+                        <TextBlock Text="نسبة الربحية" Classes="caption muted" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Card 4: Collections -->
+            <Border Grid.Column="3" Classes="panel" Padding="14,12">
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="إجمالي التحصيلات" Classes="caption muted" />
+                        <TextBlock Grid.Column="1" Text="📥" FontSize="14" Opacity="0.7" />
+                    </Grid>
+                    <TextBlock Text="{Binding CollectionsText}" Classes="subtitle" FontWeight="Bold" Foreground="#0078D4" />
+                    <TextBlock Text="{Binding CollectionRatioText}" Classes="caption muted" />
+                </StackPanel>
+            </Border>
+
+            <!-- Card 5: Overdue Receivables -->
+            <Border Grid.Column="4" Classes="panel" Padding="14,12">
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="المتأخرات المستحقة" Classes="caption muted" />
+                        <TextBlock Grid.Column="1" Text="⚠️" FontSize="14" Opacity="0.7" />
+                    </Grid>
+                    <TextBlock Text="{Binding OverdueText}" Classes="subtitle" FontWeight="Bold" Foreground="#D13438" />
+                    <TextBlock Text="{Binding OverdueCountText}" Classes="caption muted" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ========================================================
+             3. Sub-Reports Area (Tabs & DataGrids)
+             ======================================================== -->
+        <Border Grid.Row="2" Classes="panel" Padding="0">
+            <Grid RowDefinitions="Auto,*">
+
+                <!-- Tabs Header Switcher -->
+                <Border Grid.Row="0" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="0,0,0,1" CornerRadius="8,8,0,0" Padding="16,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="tab-btn" Classes.accent="{Binding IsSalesTabActive}"
+                                Command="{Binding SelectSalesTabCommand}" Padding="16,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="🛒" FontSize="14" VerticalAlignment="Center" />
+                                <TextBlock Text="فواتير المبيعات والأرباح" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="tab-btn" Classes.accent="{Binding IsProductsTabActive}"
+                                Command="{Binding SelectProductsTabCommand}" Padding="16,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="🏆" FontSize="14" VerticalAlignment="Center" />
+                                <TextBlock Text="الأصناف الأكثر مبيعاً وربحية" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="tab-btn" Classes.accent="{Binding IsOverdueTabActive}"
+                                Command="{Binding SelectOverdueTabCommand}" Padding="16,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="⏳" FontSize="14" VerticalAlignment="Center" />
+                                <TextBlock Text="أعمار الديون والمتأخرات" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="tab-btn" Classes.accent="{Binding IsCashFlowTabActive}"
+                                Command="{Binding SelectCashFlowTabCommand}" Padding="16,8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="💵" FontSize="14" VerticalAlignment="Center" />
+                                <TextBlock Text="حركة الخزينة والسيولة" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Tabs Content Host -->
+                <Panel Grid.Row="1" Margin="14">
+
+                    <!-- ========================================================
+                         TAB 0: Sales Invoices & Profits
+                         ======================================================== -->
+                    <Grid RowDefinitions="Auto,*" ColumnDefinitions="*,Auto" ColumnSpacing="14" IsVisible="{Binding IsSalesTabActive}">
+                        <!-- Top search bar -->
+                        <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,10">
+                            <TextBox Text="{Binding SearchSalesText, Mode=TwoWay}"
+                                     PlaceholderText="بحث برقم الفاتورة، اسم العميل، أو التاريخ..."
+                                     Height="36" VerticalContentAlignment="Center" />
+                        </Grid>
+
+                        <!-- Main Sales Table -->
+                        <Border Grid.Row="1" Grid.Column="0" Classes="surface">
+                            <DataGrid ItemsSource="{Binding FilteredSaleRows}"
+                                      SelectedItem="{Binding SelectedSale, Mode=TwoWay}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      GridLinesVisibility="Horizontal">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="رقم الفاتورة" Binding="{Binding DocNo}" Width="120" />
+                                    <DataGridTextColumn Header="التاريخ" Binding="{Binding DocDate}" Width="100" />
+                                    <DataGridTextColumn Header="العميل" Binding="{Binding PartyName}" Width="2*" />
+                                    <DataGridTextColumn Header="إجمالي الفاتورة" Binding="{Binding TotalText}" Width="120" />
+                                    <DataGridTextColumn Header="التكلفة" Binding="{Binding CostText}" Width="110" />
+                                    <DataGridTemplateColumn Header="صافي الربح" Width="120">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate x:DataType="vm:ReportSaleRow">
+                                                <TextBlock Text="{Binding MarginText}"
+                                                           Foreground="{Binding MarginColor}"
+                                                           FontWeight="Bold"
+                                                           VerticalAlignment="Center"
+                                                           Margin="6,0" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="نسبة الربح" Binding="{Binding MarginPercentText}" Width="90" />
+                                    <DataGridTemplateColumn Header="الأصناف" Width="80">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate x:DataType="vm:ReportSaleRow">
+                                                <Button Classes="icon"
+                                                        Command="{Binding $parent[UserControl].((vm:ReportsViewModel)DataContext).OpenSaleDetailsCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        HorizontalAlignment="Center"
+                                                        ToolTip.Tip="عرض تفاصيل أصناف هذه الفاتورة">
+                                                    <TextBlock Text="👁️" FontSize="13" />
+                                                </Button>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+
+                        <!-- Side Drawer: Invoice Line Items Drilldown -->
+                        <Border Grid.Row="1" Grid.Column="1" Width="380" Classes="surface"
+                                IsVisible="{Binding IsSaleDetailsOpen}">
+                            <Grid RowDefinitions="Auto,*,Auto" Margin="12">
+                                <!-- Drawer Header -->
+                                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <TextBlock Text="{Binding SelectedSale.DocNo, StringFormat='أصناف فاتورة: {0}'}"
+                                                   Classes="strong" FontWeight="Bold" />
+                                        <TextBlock Text="{Binding SelectedSale.PartyName, StringFormat='العميل: {0}'}"
+                                                   Classes="caption muted" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Classes="ghost" Content="✕"
+                                            Command="{Binding CloseSaleDetailsCommand}" />
+                                </Grid>
+
+                                <!-- Items List -->
+                                <DataGrid Grid.Row="1" ItemsSource="{Binding SelectedSaleItems}"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          GridLinesVisibility="Horizontal">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="الصنف" Binding="{Binding ProductName}" Width="1.5*" />
+                                        <DataGridTextColumn Header="الكمية" Binding="{Binding QuantityText}" Width="70" />
+                                        <DataGridTextColumn Header="السعر" Binding="{Binding UnitPriceText}" Width="80" />
+                                        <DataGridTextColumn Header="الإجمالي" Binding="{Binding TotalText}" Width="90" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <!-- Drawer Summary Footer -->
+                                <Border Grid.Row="2" Classes="panel" Padding="10" Margin="0,10,0,0">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="إجمالي الفاتورة:" Classes="caption muted" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedSale.TotalText}"
+                                                   FontWeight="Bold" Classes="subtitle" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- ========================================================
+                         TAB 1: Top Selling & Profitable Products
+                         ======================================================== -->
+                    <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsProductsTabActive}">
+                        <!-- Top search bar -->
+                        <Grid Grid.Row="0" Margin="0,0,0,10">
+                            <TextBox Text="{Binding SearchProductsText, Mode=TwoWay}"
+                                     PlaceholderText="ابحث باسم المنتج..."
+                                     Height="36" VerticalContentAlignment="Center" />
+                        </Grid>
+
+                        <Border Grid.Row="1" Classes="surface">
+                            <DataGrid ItemsSource="{Binding FilteredTopProducts}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      GridLinesVisibility="Horizontal">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="اسم الصنف" Binding="{Binding ProductName}" Width="2*" />
+                                    <DataGridTextColumn Header="الكمية المباعة" Binding="{Binding QuantityText}" Width="120" />
+                                    <DataGridTextColumn Header="إجمالي المبيعات" Binding="{Binding RevenueText}" Width="140" />
+                                    <DataGridTextColumn Header="إجمالي التكلفة" Binding="{Binding CostText}" Width="130" />
+                                    <DataGridTemplateColumn Header="صافي الربح" Width="140">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate x:DataType="vm:TopProductRow">
+                                                <TextBlock Text="{Binding ProfitText}"
+                                                           Foreground="{Binding ProfitColor}"
+                                                           FontWeight="Bold"
+                                                           VerticalAlignment="Center"
+                                                           Margin="6,0" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="نسبة الربح %" Binding="{Binding MarginPercentText}" Width="110" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </Grid>
+
+                    <!-- ========================================================
+                         TAB 2: Receivables & Overdue Aging
+                         ======================================================== -->
+                    <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsOverdueTabActive}">
+                        <!-- Filter chips & search bar -->
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,10">
+                            <TextBox Grid.Column="0" Text="{Binding SearchOverdueText, Mode=TwoWay}"
+                                     PlaceholderText="بحث باسم العميل أو رقم الفاتورة..."
+                                     Height="36" VerticalContentAlignment="Center" />
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <Button Classes="tab-btn" Content="كل المتأخرات"
+                                        Command="{Binding SetOverdueAgingCommand}">
+                                    <Button.CommandParameter><x:Int32>0</x:Int32></Button.CommandParameter>
+                                </Button>
+                                <Button Classes="tab-btn" Content="أكثر من 30 يوم"
+                                        Command="{Binding SetOverdueAgingCommand}">
+                                    <Button.CommandParameter><x:Int32>1</x:Int32></Button.CommandParameter>
+                                </Button>
+                                <Button Classes="tab-btn" Content="أكثر من 60 يوم"
+                                        Command="{Binding SetOverdueAgingCommand}">
+                                    <Button.CommandParameter><x:Int32>2</x:Int32></Button.CommandParameter>
+                                </Button>
+                                <Button Classes="tab-btn" Content="أكثر من 90 يوم (حرج)"
+                                        Command="{Binding SetOverdueAgingCommand}">
+                                    <Button.CommandParameter><x:Int32>3</x:Int32></Button.CommandParameter>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Grid.Row="1" Classes="surface">
+                            <DataGrid ItemsSource="{Binding FilteredOverdueRows}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      GridLinesVisibility="Horizontal">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="العميل" Binding="{Binding PartyName}" Width="2*" />
+                                    <DataGridTextColumn Header="رقم الفاتورة" Binding="{Binding DocNo}" Width="120" />
+                                    <DataGridTextColumn Header="تاريخ الاستحقاق" Binding="{Binding DueDateText}" Width="120" />
+                                    <DataGridTextColumn Header="المبلغ المستحق" Binding="{Binding AmountText}" Width="130" />
+                                    <DataGridTextColumn Header="أيام التأخير" Binding="{Binding DaysOverdue}" Width="110" />
+                                    <DataGridTemplateColumn Header="مستوى التأخير" Width="140">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate x:DataType="vm:OverdueRow">
+                                                <Border Classes="badge" Background="{Binding SeverityColor}" HorizontalAlignment="Center">
+                                                    <TextBlock Text="{Binding SeverityBadge}" Foreground="White" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </Grid>
+
+                    <!-- ========================================================
+                         TAB 3: Cash Flow & Treasury Movements
+                         ======================================================== -->
+                    <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsCashFlowTabActive}">
+                        <!-- Top search bar -->
+                        <Grid Grid.Row="0" Margin="0,0,0,10">
+                            <TextBox Text="{Binding SearchCashFlowText, Mode=TwoWay}"
+                                     PlaceholderText="بحث بالخزينة، الطرف، نوع الحركة، أو التاريخ..."
+                                     Height="36" VerticalContentAlignment="Center" />
+                        </Grid>
+
+                        <Border Grid.Row="1" Classes="surface">
+                            <DataGrid ItemsSource="{Binding FilteredCashFlowRows}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      GridLinesVisibility="Horizontal">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="التاريخ والوقت" Binding="{Binding DateText}" Width="140" />
+                                    <DataGridTextColumn Header="نوع الحركة" Binding="{Binding KindText}" Width="1.5*" />
+                                    <DataGridTextColumn Header="الخزينة / الحساب" Binding="{Binding AccountName}" Width="1.3*" />
+                                    <DataGridTextColumn Header="الطرف / المستفيد" Binding="{Binding PartyName}" Width="1.3*" />
+                                    <DataGridTemplateColumn Header="المبلغ" Width="140">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate x:DataType="vm:CashFlowRow">
+                                                <TextBlock Text="{Binding AmountText}"
+                                                           Foreground="{Binding AmountColor}"
+                                                           FontWeight="Bold"
+                                                           VerticalAlignment="Center"
+                                                           Margin="6,0" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </Grid>
+
+                </Panel>
+            </Grid>
+        </Border>
+
+    </Grid>
+</UserControl>

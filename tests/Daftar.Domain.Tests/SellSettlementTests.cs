@@ -204,19 +204,19 @@ public sealed class SellSettlementTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task A_Visa_Sale_Can_Only_Be_Banked_Into_A_Bank_Account()
+    public async Task A_Wallet_Sale_Can_Only_Be_Banked_Into_A_Wallet_Account()
     {
         var vm = await ArrangeAsync();
 
         vm.Settlement.Choice = vm.Settlement.Choices
             .First(c => c.Value == SettlementChoice.Full);
         vm.Settlement.Method = vm.Settlement.Methods
-            .First(m => m.Value == PaymentMethod.Card);
+            .First(m => m.Value == PaymentMethod.Wallet);
 
         await WaitForAsync(() => vm.Settlement.Accounts.Count > 0);
 
         Assert.NotEmpty(vm.Settlement.Accounts);
-        Assert.All(vm.Settlement.Accounts, a => Assert.Equal(CashAccountType.Bank, a.Type));
+        Assert.All(vm.Settlement.Accounts, a => Assert.Equal(CashAccountType.Wallet, a.Type));
     }
 
     [Fact]

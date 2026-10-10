@@ -407,4 +407,20 @@ public sealed class DistributorsIntegrationTests : IAsyncLifetime, IDisposable
             Assert.Contains($"trg_{table}_no_delete", triggers);
         }
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(2.5)]
+    [InlineData(5)]
+    [InlineData(50)]
+    [InlineData(99)]
+    [InlineData(100)]
+    public async Task CommissionRateCheckConstraint_AcceptsAllValidNumericValues(decimal rate)
+    {
+        var f = await ArrangeAsync(commissionRate: rate);
+        var ctx = NewContext();
+        var d = await ctx.Distributors.SingleAsync(x => x.Id == f.Distributor.Id);
+        Assert.Equal(rate, d.CommissionRate);
+    }
 }

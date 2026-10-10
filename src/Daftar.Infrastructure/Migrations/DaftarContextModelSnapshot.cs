@@ -112,6 +112,12 @@ namespace Daftar.Infrastructure.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal>("PurchasePrice")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue(0m);
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("TEXT");
 
@@ -204,7 +210,7 @@ namespace Daftar.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("CK_Distributors_CommissionBasis", "\"CommissionBasis\" IN ('Sales','Collections')");
 
-                            t.HasCheckConstraint("CK_Distributors_CommissionRate", "\"CommissionRate\" >= 0 AND \"CommissionRate\" <= 100");
+                            t.HasCheckConstraint("CK_Distributors_CommissionRate", "CAST(\"CommissionRate\" AS REAL) >= 0 AND CAST(\"CommissionRate\" AS REAL) <= 100");
                         });
                 });
 

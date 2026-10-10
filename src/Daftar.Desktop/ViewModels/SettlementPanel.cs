@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Daftar.Domain.Finance;
 using Daftar.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +34,7 @@ public partial class SettlementPanel : ObservableObject
     ];
 
     public IReadOnlyList<MethodOption> Methods { get; } =
-        Enum.GetValues<PaymentMethod>().Select(m => new MethodOption(m, m.Label())).ToList();
+        PaymentMethods.Supported.Select(m => new MethodOption(m, m.Label())).ToList();
 
     /// <summary>Accounts available for the chosen method, refreshed when the method changes.</summary>
     public ObservableCollection<AccountRow> Accounts { get; } = [];
@@ -75,6 +76,44 @@ public partial class SettlementPanel : ObservableObject
     /// <summary>The chosen method as a plain enum.</summary>
     public PaymentMethod MethodValue => Method?.Value ?? PaymentMethod.Cash;
 
+    public bool IsCashMethod => MethodValue == PaymentMethod.Cash;
+    public bool IsWalletMethod => MethodValue == PaymentMethod.Wallet;
+
+    public bool IsVodafoneCashActive => IsWalletMethod && Account is not null &&
+        (Account.Name.Contains("فودافون") || Account.Name.Contains("كاش"));
+    public bool IsInstapayActive => IsWalletMethod && Account is not null &&
+        (Account.Name.Contains("انستاباي") || Account.Name.Contains("InstaPay"));
+
+    [RelayCommand]
+    public void SelectCash()
+    {
+        Method = Methods.FirstOrDefault(m => m.Value == PaymentMethod.Cash);
+    }
+
+    [RelayCommand]
+    public void SelectWallet()
+    {
+        Method = Methods.FirstOrDefault(m => m.Value == PaymentMethod.Wallet);
+    }
+
+    [RelayCommand]
+    public async Task SelectVodafoneCashAsync()
+    {
+        Method = Methods.FirstOrDefault(m => m.Value == PaymentMethod.Wallet);
+        await ReloadAccountsSafeAsync();
+        var target = Accounts.FirstOrDefault(a => a.Name.Contains("فودافون") || a.Name.Contains("كاش"));
+        if (target is not null) Account = target;
+    }
+
+    [RelayCommand]
+    public async Task SelectInstapayAsync()
+    {
+        Method = Methods.FirstOrDefault(m => m.Value == PaymentMethod.Wallet);
+        await ReloadAccountsSafeAsync();
+        var target = Accounts.FirstOrDefault(a => a.Name.Contains("انستاباي") || a.Name.Contains("InstaPay"));
+        if (target is not null) Account = target;
+    }
+
     partial void OnChoiceChanged(SettlementOption? value)
     {
         OnPropertyChanged(nameof(Settlement));
@@ -82,7 +121,21 @@ public partial class SettlementPanel : ObservableObject
         OnPropertyChanged(nameof(IsActive));
     }
 
-    partial void OnMethodChanged(MethodOption? value) => _ = ReloadAccountsSafeAsync();
+    partial void OnMethodChanged(MethodOption? value)
+    {
+        OnPropertyChanged(nameof(MethodValue));
+        OnPropertyChanged(nameof(IsCashMethod));
+        OnPropertyChanged(nameof(IsWalletMethod));
+        OnPropertyChanged(nameof(IsVodafoneCashActive));
+        OnPropertyChanged(nameof(IsInstapayActive));
+        _ = ReloadAccountsSafeAsync();
+    }
+
+    partial void OnAccountChanged(AccountRow? value)
+    {
+        OnPropertyChanged(nameof(IsVodafoneCashActive));
+        OnPropertyChanged(nameof(IsInstapayActive));
+    }
 
     /// <summary>Loads the accounts the current method can be received into.</summary>
     public async Task LoadAsync()

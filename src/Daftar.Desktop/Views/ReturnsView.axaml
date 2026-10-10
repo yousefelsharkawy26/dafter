@@ -1,0 +1,443 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Daftar.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Daftar.Views.ReturnsView"
+             x:DataType="vm:ReturnsViewModel"
+             FlowDirection="RightToLeft">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="{StaticResource PagePadding}">
+
+        <!-- ========================================================
+             1. Header Bar: KPIs + Primary Actions
+             ======================================================== -->
+        <Border Grid.Row="0" Classes="panel" Margin="0,0,0,12" Padding="16,12">
+            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+
+                <!-- Title & KPI Badges -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="إدارة مرتجعات المبيعات" Classes="subtitle" FontWeight="Bold" />
+                        <TextBlock Text="تسجيل استرجاع البضائع من العملاء، استرداد الدفعات، وإعادة اللوتات للمخزون" Classes="caption muted" />
+                    </StackPanel>
+
+                    <Rectangle Width="1" Height="28" Fill="{DynamicResource ControlStrokeColorDefaultBrush}" Margin="8,0" />
+
+                    <!-- KPIs -->
+                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <Border Classes="surface" Padding="10,4">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="إجمالي المرتجعات:" Classes="caption" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding TotalReturnsCount}" Classes="strong" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="surface" Padding="10,4">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="قيمة المرتجعات:" Classes="caption" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding TotalReturnsAmount, StringFormat='{}{0:N2} ج.م'}" Classes="strong caution" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="surface" Padding="10,4" IsVisible="{Binding TodayReturnsCount}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="مرتجعات اليوم:" Classes="caption" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding TodayReturnsCount, StringFormat='{}{0} مرتجع'}" Classes="strong success" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding TodayReturnsAmount, StringFormat='({0:N2} ج.م)'}" Classes="caption muted" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Action Buttons -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Classes="ghost" Command="{Binding LoadCommand}" ToolTip.Tip="تحديث القائمة">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="🔄" FontSize="14" VerticalAlignment="Center" />
+                            <TextBlock Text="تحديث" Classes="caption" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <!-- New Return Button (visible in history mode) -->
+                    <Button Classes="accent" Command="{Binding StartCreateReturnCommand}"
+                            IsVisible="{Binding !IsCreatingReturn}" Padding="16,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="+" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                            <TextBlock Text="إنشاء مرتجع جديد" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Back to History Button (visible in create mode) -->
+                    <Button Classes="ghost" Command="{Binding CancelCreateReturnCommand}"
+                            IsVisible="{Binding IsCreatingReturn}" Padding="14,8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="✕" FontSize="12" VerticalAlignment="Center" />
+                            <TextBlock Text="العودة لسجل المرتجعات" Classes="caption" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ========================================================
+             2. Main Content
+             ======================================================== -->
+        <Grid Grid.Row="1">
+
+            <!-- ========================================================
+                 MODE A: Create New Return Wizard
+                 ======================================================== -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" IsVisible="{Binding IsCreatingReturn}">
+                <StackPanel Spacing="12">
+
+                    <!-- Step 1: Select Original Invoice -->
+                    <Border Classes="panel" Padding="16">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="1. البحث عن الفاتورة الأصلية واختيارها" Classes="heading" Margin="0" />
+                                    <TextBlock Text="ابحث برقم الفاتورة (SO-...) أو اسم العميل أو رقم الهاتف لاختيار الفاتورة المراد إرجاعها" Classes="caption muted" />
+                                </StackPanel>
+
+                                <!-- Selected Invoice Tag -->
+                                <Border Grid.Column="1" Classes="badge success" Padding="10,4"
+                                        IsVisible="{Binding SelectedInvoice, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="✓ تم اختيار:" Classes="caption" />
+                                        <TextBlock Text="{Binding SelectedInvoice.DocNo}" FontWeight="Bold" Classes="caption" />
+                                        <TextBlock Text="—" Classes="caption" />
+                                        <TextBlock Text="{Binding SelectedInvoice.PartyName}" Classes="caption" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- Search Input & Button -->
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding InvoiceSearchQuery, Mode=TwoWay}"
+                                         PlaceholderText="اكتب رقم الفاتورة أو اسم العميل أو الهاتف..."
+                                         Height="38"
+                                         VerticalContentAlignment="Center">
+                                    <TextBox.InnerLeftContent>
+                                        <PathIcon Data="{StaticResource IconSearch}" Width="15" Height="15" Margin="10,0" Opacity="0.6" />
+                                    </TextBox.InnerLeftContent>
+                                </TextBox>
+
+                                <Button Grid.Column="1" Classes="primary" Content="بحث عن الفواتير"
+                                        Command="{Binding SearchInvoicesCommand}" Padding="16,8" />
+                            </Grid>
+
+                            <!-- Candidate Invoices List (Quick Pick) -->
+                            <Border Classes="surface" Padding="10" IsVisible="{Binding CandidateInvoices.Count}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="الفواتير المتاحة (اضغط لاختيار الفاتورة):" Classes="caption" FontWeight="SemiBold" />
+                                    <ItemsControl ItemsSource="{Binding CandidateInvoices}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:OriginalInvoiceCandidate">
+                                                <Border Classes="surface" Padding="10,6" Margin="0,2">
+                                                    <Grid ColumnDefinitions="140,120,*,140,Auto" ColumnSpacing="12" VerticalAlignment="Center">
+                                                        <TextBlock Grid.Column="0" Text="{Binding DocNo}" FontWeight="Bold" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding DocDate}" Classes="caption muted" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding PartyName}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="3" Text="{Binding TotalText}" Classes="strong" VerticalAlignment="Center" />
+                                                        <Button Grid.Column="4" Classes="accent" Content="اختيار الفاتورة"
+                                                                Command="{Binding $parent[UserControl].((vm:ReturnsViewModel)DataContext).SelectInvoiceCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                Padding="12,4" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Step 2: Select Items and Quantities to Return -->
+                    <Border Classes="panel" Padding="16" IsVisible="{Binding SelectedInvoice, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="2. تحديد الأصناف والكميات المرتجعة" Classes="heading" Margin="0" />
+                                    <TextBlock Text="حدد الأصناف التي يعيدها العميل وقم بتعديل الكمية حسب الرغبة" Classes="caption muted" />
+                                </StackPanel>
+
+                                <!-- Quick selection actions -->
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="ghost" Content="تحديد كل الأصناف" Command="{Binding SelectAllLinesCommand}" />
+                                    <Button Classes="ghost" Content="إلغاء التحديد" Command="{Binding DeselectAllLinesCommand}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Items DataGrid -->
+                            <DataGrid ItemsSource="{Binding ReturnCandidateLines}"
+                                      AutoGenerateColumns="False"
+                                      CanUserResizeColumns="True"
+                                      IsReadOnly="True"
+                                      MaxHeight="260">
+                                <DataGrid.Columns>
+                                    <!-- Selected Checkbox -->
+                                    <DataGridTemplateColumn Header="إرجاع؟" Width="70">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate x:DataType="vm:ReturnItemCandidateViewModel">
+                                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <DataGridTextColumn Header="الصنف" Binding="{Binding ProductName}" Width="2*" />
+                                    <DataGridTextColumn Header="الوحدة" Binding="{Binding UnitName}" Width="80" />
+                                    <DataGridTextColumn Header="الكمية المباعة" Binding="{Binding OriginalQuantity}" Width="100" />
+                                    <DataGridTextColumn Header="المرتجع سابقاً" Binding="{Binding AlreadyReturnedQuantity}" Width="100" />
+                                    <DataGridTextColumn Header="المتاح للإرجاع" Binding="{Binding MaxReturnableQuantity}" Width="110" />
+
+                                    <!-- Return Quantity Controller -->
+                                    <DataGridTemplateColumn Header="الكمية المرتجعة" Width="170">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate x:DataType="vm:ReturnItemCandidateViewModel">
+                                                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                    <Button Classes="icon" Command="{Binding DecrementQuantityCommand}" ToolTip.Tip="تقليل">
+                                                        <TextBlock Text="−" FontSize="16" />
+                                                    </Button>
+                                                    <TextBox Text="{Binding ReturnQuantity, Mode=TwoWay}"
+                                                             Width="56" Height="28"
+                                                             TextAlignment="Center"
+                                                             VerticalContentAlignment="Center"
+                                                             FontSize="12" FontWeight="Bold" />
+                                                    <Button Classes="icon" Command="{Binding IncrementQuantityCommand}" ToolTip.Tip="زيادة">
+                                                        <TextBlock Text="+" FontSize="16" />
+                                                    </Button>
+                                                    <Button Classes="ghost" Content="الكل"
+                                                            Command="{Binding SetMaxQuantityCommand}"
+                                                            Padding="4,2" FontSize="11" ToolTip.Tip="إرجاع كامل المتاح" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <DataGridTextColumn Header="سعر الوحدة" Binding="{Binding UnitPrice, StringFormat='{}{0:N2} ج.م'}" Width="100" />
+                                    <DataGridTextColumn Header="المبلغ المسترد" Binding="{Binding LineRefundAmountText}" Width="120" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <!-- Refund Summary & Posting Action -->
+                            <Border Classes="surface" Padding="16" Margin="0,8,0,0">
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="ملاحظات المرتجع (اختياري):" Classes="caption" />
+                                        <TextBox Text="{Binding ReturnNotes, Mode=TwoWay}"
+                                                 PlaceholderText="مثال: عيب صناعة، رغبة العميل، منتج غير مطابق..." />
+                                    </StackPanel>
+
+                                    <!-- Total Refund Amount Badge -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="2">
+                                        <TextBlock Text="إجمالي المبلغ المسترد للعميل:" Classes="caption" HorizontalAlignment="Right" />
+                                        <TextBlock Text="{Binding TotalRefundAmount, StringFormat='{}{0:N2} ج.م'}"
+                                                   Classes="display" Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                                   HorizontalAlignment="Right" />
+                                    </StackPanel>
+
+                                    <!-- Post Return Button -->
+                                    <Button Grid.Column="2" Classes="accent"
+                                            Command="{Binding ConfirmAndPostReturnCommand}"
+                                            IsEnabled="{Binding CanConfirmReturn}"
+                                            Height="48" Padding="20,0"
+                                            VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <PathIcon Data="{StaticResource IconCheck}" Width="16" Height="16" />
+                                            <TextBlock Text="تأكيد وترحيل المرتجع" FontWeight="Bold" FontSize="15" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ========================================================
+                 MODE B: Returns History & Details Panel
+                 ======================================================== -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding !IsCreatingReturn}">
+
+                <!-- Left: Returns Table & Filter Bar -->
+                <Border Grid.Column="0" Classes="panel">
+                    <Grid RowDefinitions="Auto,*" Margin="12">
+
+                        <!-- Filter & Search Bar -->
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,10">
+                            <!-- Search TextBox -->
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding SearchText, Mode=TwoWay}"
+                                     PlaceholderText="ابحث برقم المرتجع، رقم الفاتورة الأصلية، أو اسم العميل..."
+                                     Height="38"
+                                     VerticalContentAlignment="Center">
+                                <TextBox.InnerLeftContent>
+                                    <PathIcon Data="{StaticResource IconSearch}" Width="15" Height="15" Margin="10,0" Opacity="0.6" />
+                                </TextBox.InnerLeftContent>
+                            </TextBox>
+
+                            <!-- Date Filter Chips -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <Button Classes="ghost" Content="الكل" Command="{Binding SetFilterCommand}">
+                                    <Button.CommandParameter><x:Int32>0</x:Int32></Button.CommandParameter>
+                                </Button>
+                                <Button Classes="ghost" Content="اليوم" Command="{Binding SetFilterCommand}">
+                                    <Button.CommandParameter><x:Int32>1</x:Int32></Button.CommandParameter>
+                                </Button>
+                                <Button Classes="ghost" Content="هذا الشهر" Command="{Binding SetFilterCommand}">
+                                    <Button.CommandParameter><x:Int32>2</x:Int32></Button.CommandParameter>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Returns DataGrid -->
+                        <Grid Grid.Row="1">
+                            <DataGrid ItemsSource="{Binding FilteredRows}"
+                                      SelectedItem="{Binding SelectedReturnRow, Mode=TwoWay}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      GridLinesVisibility="Horizontal">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="رقم المرتجع" Binding="{Binding DocNo}" Width="140" />
+                                    <DataGridTextColumn Header="التاريخ" Binding="{Binding DocDate}" Width="110" />
+                                    <DataGridTextColumn Header="العميل" Binding="{Binding PartyName}" Width="2*" />
+                                    <DataGridTextColumn Header="الفاتورة الأصلية" Binding="{Binding OriginalDocNo}" Width="140" />
+                                    <DataGridTextColumn Header="القيمة المستردة" Binding="{Binding TotalText}" Width="120" />
+                                    
+                                    <!-- Status Column -->
+                                    <DataGridTemplateColumn Header="الحالة" Width="90">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate x:DataType="vm:ReturnRow">
+                                                <Border Classes="badge success" HorizontalAlignment="Center">
+                                                    <TextBlock Text="{Binding Status}" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <!-- View Details Action Button -->
+                                    <DataGridTemplateColumn Header="تفاصيل" Width="80">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate x:DataType="vm:ReturnRow">
+                                                <Button Classes="icon"
+                                                        Command="{Binding $parent[UserControl].((vm:ReturnsViewModel)DataContext).SelectReturnRowCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        HorizontalAlignment="Center"
+                                                        ToolTip.Tip="عرض تفاصيل وبنود المرتجع">
+                                                    <TextBlock Text="👁️" FontSize="13" />
+                                                </Button>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <!-- Empty List Notification -->
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                                        Spacing="8" IsVisible="{Binding !FilteredRows.Count}">
+                                <TextBlock Text="📄" FontSize="36" HorizontalAlignment="Center" Opacity="0.4" />
+                                <TextBlock Text="لا توجد مرتجعات مسجلة" Classes="subtitle" HorizontalAlignment="Center" />
+                                <TextBlock Text="يمكنك تسجيل مرتجع جديد من زر 'إنشاء مرتجع جديد' أعلاه" Classes="caption muted" HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- Right: Return Details Drawer / Panel -->
+                <Border Grid.Column="1" Width="360" Classes="panel"
+                        IsVisible="{Binding IsDetailsPanelOpen}">
+                    <Grid RowDefinitions="Auto,*,Auto" Margin="14">
+
+                        <!-- Header -->
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <TextBlock Text="{Binding SelectedReturnDetails.DocNo, StringFormat='مرتجع: {0}'}"
+                                           Classes="heading" Margin="0" />
+                                <TextBlock Text="{Binding SelectedReturnDetails.DocDate, StringFormat='بتاريخ: {0}'}"
+                                           Classes="caption muted" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Classes="ghost" Content="✕"
+                                    Command="{Binding CloseDetailsPanelCommand}"
+                                    ToolTip.Tip="إغلاق اللوحة" />
+                        </Grid>
+
+                        <!-- Content Details -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="10">
+                                <!-- Meta Cards -->
+                                <Border Classes="surface" Padding="10">
+                                    <StackPanel Spacing="6">
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <TextBlock Text="العميل:" Classes="caption muted" Width="90" />
+                                            <TextBlock Grid.Column="1" Text="{Binding SelectedReturnDetails.PartyName}" FontWeight="SemiBold" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <TextBlock Text="الفاتورة الأصلية:" Classes="caption muted" Width="90" />
+                                            <TextBlock Grid.Column="1" Text="{Binding SelectedReturnDetails.OriginalDocNo}" FontWeight="SemiBold" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding SelectedReturnDetails.Notes, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                            <TextBlock Text="ملاحظات:" Classes="caption muted" Width="90" />
+                                            <TextBlock Grid.Column="1" Text="{Binding SelectedReturnDetails.Notes}" TextWrapping="Wrap" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Items List -->
+                                <TextBlock Text="الأصناف المسترجعة:" Classes="caption" FontWeight="Bold" Margin="0,4,0,0" />
+                                <ItemsControl ItemsSource="{Binding SelectedReturnDetails.Items}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ReturnDetailItemRow">
+                                            <Border Classes="surface" Padding="8" Margin="0,2">
+                                                <Grid RowDefinitions="Auto,Auto" RowSpacing="2">
+                                                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                                                        <TextBlock Grid.Column="0" Text="{Binding ProductName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding LineTotalText}" FontWeight="Bold" />
+                                                    </Grid>
+                                                    <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
+                                                        <TextBlock Grid.Column="0" Classes="caption muted"
+                                                                   Text="{Binding Quantity, StringFormat='الكمية: {0}'}" />
+                                                        <TextBlock Grid.Column="1" Classes="caption muted"
+                                                                   Text="{Binding UnitPrice, StringFormat='السعر: {0:N2} ج.م'}" />
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Footer Total -->
+                        <Border Grid.Row="2" Classes="surface" Padding="12" Margin="0,10,0,0">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="إجمالي المرتجع:" Classes="subtitle" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="{Binding SelectedReturnDetails.TotalText}"
+                                           Classes="price" FontSize="18" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- ========================================================
+             3. Bottom Status Notification Bar
+             ======================================================== -->
+        <Border Grid.Row="2" Classes="panel" Margin="0,10,0,0" Padding="12,6">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <TextBlock Grid.Column="0" Text="الحالة:" FontWeight="SemiBold" Classes="caption" Margin="0,0,8,0" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" Classes="caption strong" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding CreateStatusMessage}" Classes="caption strong success"
+                           IsVisible="{Binding CreateStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

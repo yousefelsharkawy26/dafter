@@ -13,6 +13,7 @@ public partial class SellView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        Loaded += (_, _) => FocusSearch();
     }
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
@@ -24,5 +25,25 @@ public partial class SellView : UserControl
 
         _loaded = true;
         await vm.LoadAsync();
+        FocusSearch();
+    }
+
+    private void FocusSearch()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            var searchBox = this.FindControl<TextBox>("SearchBox");
+            searchBox?.Focus();
+        });
+    }
+
+    private void OnSearchKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == Avalonia.Input.Key.Enter && DataContext is SellViewModel vm)
+        {
+            vm.SubmitSearchCommand.Execute(null);
+            e.Handled = true;
+            FocusSearch();
+        }
     }
 }

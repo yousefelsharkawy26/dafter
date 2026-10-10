@@ -26,6 +26,8 @@ public partial class TabViewModel(TabSpec spec) : ObservableObject
     [ObservableProperty]
     private string _title = spec.Title;
 
+    public string Icon => TabKeys.IconFor(Key);
+
     public void SetCaption(string caption)
     {
         if (!string.IsNullOrWhiteSpace(caption))
@@ -57,7 +59,6 @@ public static class TabKeys
     public const string Payments = "payments";
     public const string Stock = "stock";
     public const string Parties = "parties";
-    public const string Distributors = "distributors";
     public const string Sessions = "sessions";
     public const string Reports = "reports";
     public const string Settings = "settings";
@@ -65,8 +66,8 @@ public static class TabKeys
     /// <summary>Launcher strip order, right to left.</summary>
     public static readonly string[] Order =
     [
-        Dashboard, Sell, Receive, Returns, Products, Stock,
-        Payments, Parties, Distributors, Sessions, Reports, Settings,
+        Sell, Receive, Returns, Products, Stock,
+        Payments, Parties, Sessions, Reports, Settings,
     ];
 
     public static string TitleFor(string key) => key switch
@@ -79,10 +80,24 @@ public static class TabKeys
         Payments => "المقبوضات",
         Stock => "المخزون",
         Parties => "الأطراف",
-        Distributors => "الموزعين",
-        Sessions => "الجولات",
+        Sessions => "الموزعين",
         Reports => "التقارير",
         Settings => "الإعدادات",
         _ => key,
+    };
+
+    public static string IconFor(string key) => key switch
+    {
+        Sell => "🛒",
+        Products => "🏷️",
+        Receive => "📥",
+        Returns => "🔄",
+        Payments => "💵",
+        Stock => "📦",
+        Parties => "👥",
+        Sessions => "🚚",
+        Reports => "📈",
+        Settings => "⚙️",
+        _ => "📄",
     };
 }

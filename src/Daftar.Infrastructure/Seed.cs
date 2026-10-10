@@ -65,8 +65,6 @@ public static class Seed
         new() { Name = "الكاشير", Type = CashAccountType.Cash },
         new() { Name = "فودافون كاش", Type = CashAccountType.Wallet },
         new() { Name = "انستاباي", Type = CashAccountType.Wallet },
-        new() { Name = "الفيزا (ماكينة)", Type = CashAccountType.Bank },
-        new() { Name = "البنك", Type = CashAccountType.Bank },
     ];
 
     /// <summary>
@@ -89,24 +87,33 @@ public static class Seed
     {
         var defaults = new (string Key, string Value)[]
         {
-            (Setting.Keys.CompanyName, "Daftar"),
+            (Setting.Keys.CompanyName, "دفتر"),
             (Setting.Keys.TaxNumber, string.Empty),
             (Setting.Keys.Phone, string.Empty),
             (Setting.Keys.Address, string.Empty),
-            (Setting.Keys.ReceiptFooter, "Thank you"),
+            (Setting.Keys.ReceiptFooter, "شكراً لتعاملكم معنا"),
             (Setting.Keys.LockedUntilDate, DateOnly.MinValue.ToString("yyyy-MM-dd")),
         };
 
         var existing = await context.Settings
             .Where(s => defaults.Select(d => d.Key).Contains(s.Key))
-            .Select(s => s.Key)
             .ToListAsync(ct);
 
+        var existingKeys = existing.Select(s => s.Key).ToHashSet();
         var now = DateTime.UtcNow;
+
         foreach (var (key, value) in defaults)
         {
-            if (existing.Contains(key))
+            if (existingKeys.Contains(key))
+            {
+                var row = existing.First(s => s.Key == key);
+                if (key == Setting.Keys.ReceiptFooter && row.Value == "Thank you")
+                {
+                    row.Value = value;
+                    row.UpdatedAt = now;
+                }
                 continue;
+            }
 
             context.Settings.Add(new Setting { Key = key, Value = value, UpdatedAt = now });
         }
@@ -162,13 +169,24 @@ public static class Seed
 
     private static async Task SeedWalkInCustomerAsync(DaftarContext context, CancellationToken ct)
     {
+        var existingWalkIn = await context.Parties.FirstOrDefaultAsync(p => p.Code == "WALKIN", ct);
+        if (existingWalkIn is not null)
+        {
+            if (existingWalkIn.Name == "Walk-in customer")
+            {
+                existingWalkIn.Name = "عميل نقدي";
+                await context.SaveChangesAsync(ct);
+            }
+            return;
+        }
+
         if (await context.Parties.AnyAsync(ct))
             return;
 
         var walkIn = new Party
         {
             Code = "WALKIN",
-            Name = "Walk-in customer",
+            Name = "عميل نقدي",
             IsCustomer = true,
             IsSupplier = false,
             CustomerType = CustomerType.Individual,

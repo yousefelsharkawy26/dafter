@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Daftar.Views;
@@ -18,17 +19,23 @@ namespace Daftar.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
 {
     private readonly Dictionary<string, TabSpec> _pages;
+    private readonly Daftar.Services.INavigationService? _navigation;
+    private IServiceProvider? _services;
 
-    public MainWindowViewModel()
+    public MainWindowViewModel() : this(null) { }
+
+    public MainWindowViewModel(Daftar.Services.INavigationService? navigation)
     {
+        _navigation = navigation;
+        if (_navigation is not null)
+        {
+            _navigation.Navigated += Open;
+        }
+
         Tabs = [];
 
         _pages = new Dictionary<string, TabSpec>
         {
-            [TabKeys.Dashboard] = new(TabKeys.Dashboard, TabKeys.TitleFor(TabKeys.Dashboard),
-                typeof(DashboardView), typeof(DashboardViewModel),
-                "نظرة عامة على اليوم", CanClose: false),
-
             [TabKeys.Sell] = new(TabKeys.Sell, TabKeys.TitleFor(TabKeys.Sell),
                 typeof(SellView), typeof(SellViewModel), "فاتورة بيع"),
 
@@ -38,17 +45,33 @@ public partial class MainWindowViewModel : ObservableObject
             [TabKeys.Receive] = new(TabKeys.Receive, TabKeys.TitleFor(TabKeys.Receive),
                 typeof(ReceiveView), typeof(ReceiveViewModel), "استلام فاتورة مورد وتوليد اللوتات"),
 
-            // No screen yet: these render a placeholder that says what the page will do.
-            [TabKeys.Returns] = Placeholder(TabKeys.Returns, "مرتجع العميل وتالف المرتجع"),
+            [TabKeys.Returns] = new(TabKeys.Returns, TabKeys.TitleFor(TabKeys.Returns),
+                typeof(ReturnsView), typeof(ReturnsViewModel),
+                "مرتجع العميل وتالف المرتجع"),
+
             [TabKeys.Payments] = new(TabKeys.Payments, TabKeys.TitleFor(TabKeys.Payments),
                 typeof(PaymentsView), typeof(PaymentsViewModel),
                 "تحصيل من العملاء ودفع للموردين"),
-            [TabKeys.Stock] = Placeholder(TabKeys.Stock, "المخزون الحالي وقرب الانتهاء والتحويلات"),
-            [TabKeys.Parties] = Placeholder(TabKeys.Parties, "العملاء والموردون والأرصدة"),
-            [TabKeys.Distributors] = Placeholder(TabKeys.Distributors, "الموزعون ومركباتهم وحساباتهم"),
-            [TabKeys.Sessions] = Placeholder(TabKeys.Sessions, "فتح جولة الموزع وتسويتها"),
-            [TabKeys.Reports] = Placeholder(TabKeys.Reports, "الأرباح والتحصيلات والمتأخرات"),
-            [TabKeys.Settings] = Placeholder(TabKeys.Settings, "بيانات الشركة والفواتير"),
+
+            [TabKeys.Stock] = new(TabKeys.Stock, TabKeys.TitleFor(TabKeys.Stock),
+                typeof(StockView), typeof(StockViewModel),
+                "المخزون الحالي وقرب الانتهاء"),
+
+            [TabKeys.Parties] = new(TabKeys.Parties, TabKeys.TitleFor(TabKeys.Parties),
+                typeof(PartiesView), typeof(PartiesViewModel),
+                "العملاء والموردون والأرصدة"),
+
+            [TabKeys.Sessions] = new(TabKeys.Sessions, TabKeys.TitleFor(TabKeys.Sessions),
+                typeof(SessionsView), typeof(SessionsViewModel),
+                "الموزعون ومركباتهم وحساباتهم"),
+
+            [TabKeys.Reports] = new(TabKeys.Reports, TabKeys.TitleFor(TabKeys.Reports),
+                typeof(ReportsView), typeof(ReportsViewModel),
+                "الأرباح والتحصيلات والمتأخرات"),
+
+            [TabKeys.Settings] = new(TabKeys.Settings, TabKeys.TitleFor(TabKeys.Settings),
+                typeof(SettingsView), typeof(SettingsViewModel),
+                "بيانات الشركة والفواتير"),
         };
 
         Launcher = TabKeys.Order
@@ -56,8 +79,8 @@ public partial class MainWindowViewModel : ObservableObject
             .Select(key => new LauncherButton(key, TabKeys.TitleFor(key)))
             .ToList();
 
-        Tabs.Add(new TabViewModel(_pages[TabKeys.Dashboard]));
-        SelectedTab = Tabs[0];
+        // Start Menu is the default landing screen (no Dashboard tab).
+        _isStartMenuOpen = true;
     }
 
     private static TabSpec Placeholder(string key, string caption)
@@ -66,6 +89,8 @@ public partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<TabViewModel> Tabs { get; }
 
     public IReadOnlyList<LauncherButton> Launcher { get; }
+
+    public bool HasOpenTabs => Tabs.Count > 0;
 
     [ObservableProperty]
     private TabViewModel? _selectedTab;
@@ -77,16 +102,76 @@ public partial class MainWindowViewModel : ObservableObject
     private string _currentUserName = string.Empty;
 
     [ObservableProperty]
-    private bool _isStartMenuOpen;
+    private bool _isStartMenuOpen = true;
+
+    [ObservableProperty]
+    private DashboardViewModel? _stats;
+
+    public event Action? RequestSignOut;
+
+    [ObservableProperty]
+    private string _searchQuery = string.Empty;
+
+    public string CurrentDateText => DateTime.Now.ToString("dddd، d MMMM yyyy", new System.Globalization.CultureInfo("ar-EG"));
+
+    public string Greeting
+    {
+        get
+        {
+            var hour = DateTime.Now.Hour;
+            var period = (hour >= 4 && hour < 12) ? "صباح الخير" : "مساء الخير";
+            return string.IsNullOrEmpty(CurrentUserName) ? period : $"{period}، {CurrentUserName}";
+        }
+    }
 
     [RelayCommand]
-    public void ToggleStartMenu() => IsStartMenuOpen = !IsStartMenuOpen;
+    public void SignOut() => RequestSignOut?.Invoke();
 
     [RelayCommand]
-    public void CloseStartMenu() => IsStartMenuOpen = false;
+    public async Task RefreshStatsAsync()
+    {
+        if (Stats is not null)
+        {
+            await Stats.LoadAsync();
+            StatusText = $"تم تحديث البيانات — {DateTime.Now:HH:mm:ss}";
+        }
+    }
+
+    [RelayCommand]
+    public void ToggleStartMenu()
+    {
+        IsStartMenuOpen = !IsStartMenuOpen;
+        if (IsStartMenuOpen)
+        {
+            _ = Stats?.LoadAsync();
+        }
+    }
+
+    [RelayCommand]
+    public void CloseStartMenu()
+    {
+        if (HasOpenTabs)
+            IsStartMenuOpen = false;
+    }
 
     /// <summary>Handed to TabHost so each page can resolve its own view model.</summary>
-    public IServiceProvider? Services { get; init; }
+    public IServiceProvider? Services
+    {
+        get => _services;
+        init
+        {
+            _services = value;
+            if (value is not null)
+            {
+                Stats = new DashboardViewModel(value);
+                _ = Stats.LoadAsync();
+            }
+            if (_navigation is null && value?.GetService(typeof(Daftar.Services.INavigationService)) is Daftar.Services.INavigationService nav)
+            {
+                nav.Navigated += Open;
+            }
+        }
+    }
 
     public sealed record LauncherButton(string Key, string Title);
 
@@ -94,15 +179,17 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     public void Open(string? key)
     {
-        IsStartMenuOpen = false;
-
         if (key is null || !_pages.TryGetValue(key, out var spec))
             return;
+
+        IsStartMenuOpen = false;
 
         var existing = Tabs.FirstOrDefault(t => t.Key == key);
         if (existing is not null)
         {
             SelectedTab = existing;
+            StatusText = existing.Title;
+            OnPropertyChanged(nameof(HasOpenTabs));
             return;
         }
 
@@ -110,6 +197,7 @@ public partial class MainWindowViewModel : ObservableObject
         Tabs.Add(tab);
         SelectedTab = tab;
         StatusText = tab.Title;
+        OnPropertyChanged(nameof(HasOpenTabs));
     }
 
     [RelayCommand]
@@ -120,10 +208,20 @@ public partial class MainWindowViewModel : ObservableObject
 
         var index = Tabs.IndexOf(tab);
         Tabs.Remove(tab);
-        SelectedTab = Tabs.Count == 0 ? null : Tabs[Math.Clamp(index, 0, Tabs.Count - 1)];
+        if (Tabs.Count == 0)
+        {
+            SelectedTab = null;
+            IsStartMenuOpen = true;
+            _ = Stats?.LoadAsync();
+        }
+        else
+        {
+            SelectedTab = Tabs[Math.Clamp(index, 0, Tabs.Count - 1)];
+        }
+        OnPropertyChanged(nameof(HasOpenTabs));
     }
 
-    /// <summary>Closes every page except the home tab and whatever is selected.</summary>
+    /// <summary>Closes every page except the selected tab.</summary>
     [RelayCommand]
     public void CloseOtherTabs()
     {
@@ -135,6 +233,7 @@ public partial class MainWindowViewModel : ObservableObject
             Tabs.Remove(tab);
 
         StatusText = "تم إغلاق باقي التبويبات";
+        OnPropertyChanged(nameof(HasOpenTabs));
     }
 
     [RelayCommand]

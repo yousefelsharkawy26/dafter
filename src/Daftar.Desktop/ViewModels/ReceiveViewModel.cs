@@ -15,14 +15,225 @@ using Daftar.Domain.Shared;
 using Daftar.Infrastructure;
 using Daftar.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Daftar.ViewModels;
 
+public sealed record SupplierOption(int Id, string Name, decimal Balance)
+{
+    public string Display => Balance != 0m
+        ? $"{Name} (مستحق له: {Balance:N2} ج.م)"
+        : Name;
+
+    public override string ToString() => Display;
+}
+
+public sealed record ReceiveUnitOption(
+    int ProductUnitId,
+    string UnitName,
+    decimal UnitFactor,
+    decimal PurchasePrice,
+    decimal OnHand)
+{
+    public override string ToString() => UnitName;
+}
+
+public sealed partial class ReceiveProductOption : ObservableObject
+{
+    public int ProductId { get; }
+    public string Sku { get; }
+    public string Name { get; }
+
+    public ObservableCollection<ReceiveUnitOption> AvailableUnits { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProductUnitId), nameof(UnitName), nameof(UnitFactor),
+                              nameof(PurchasePrice), nameof(OnHand),
+                              nameof(Display), nameof(PurchasePriceText), nameof(OnHandText),
+                              nameof(HasStock), nameof(HasMultipleUnits))]
+    private ReceiveUnitOption? _selectedUnit;
+
+    public int     ProductUnitId => SelectedUnit?.ProductUnitId ?? 0;
+    public string  UnitName      => SelectedUnit?.UnitName      ?? string.Empty;
+    public decimal UnitFactor    => SelectedUnit?.UnitFactor    ?? 1m;
+    public decimal PurchasePrice => SelectedUnit?.PurchasePrice ?? 0m;
+    public decimal OnHand        => SelectedUnit?.OnHand        ?? 0m;
+
+    public string Display           => $"{Name} ({UnitName}) — {Sku}";
+    public string PurchasePriceText => PurchasePrice > 0 ? $"{PurchasePrice:N2} ج.م" : "سعر غير محدد";
+    public string OnHandText        => $"المخزون: {OnHand:N0}";
+    public bool   HasStock          => OnHand > 0m;
+    public bool   HasMultipleUnits  => AvailableUnits.Count > 1;
+
+    public ReceiveProductOption(int productId, string sku, string name)
+    {
+        ProductId = productId;
+        Sku = sku;
+        Name = name;
+    }
+
+    public override string ToString() => Display;
+}
+
+public partial class ReceiveLine : ObservableObject
+{
+    public int ProductId { get; init; }
+
+    [ObservableProperty] private int _productUnitId;
+    public string Sku { get; init; } = string.Empty;
+    public string ProductName { get; init; } = string.Empty;
+
+    [ObservableProperty] private string _unitName = string.Empty;
+    [ObservableProperty] private decimal _unitFactor = 1m;
+
+    [ObservableProperty] private bool _updateProductPurchasePrice;
+    [ObservableProperty] private decimal _referencePurchasePrice;
+    [ObservableProperty] private decimal? _scannedUnitPrice;
+
+    public bool HasPriceDiscrepancy => ReferencePurchasePrice > 0m && UnitPrice > 0m && UnitPrice != ReferencePurchasePrice;
+    public string PriceDiscrepancyText => HasPriceDiscrepancy
+        ? $"السعر الحالي في النظام: {ReferencePurchasePrice:N2} ج.م"
+        : string.Empty;
+
+    private bool _isManualPrice;
+    private int? _manualPriceUnitId;
+    private bool _suppressManualPriceTracking;
+
+    public ObservableCollection<ReceiveUnitOption> AvailableUnits { get; } = [];
+
+    [ObservableProperty] private ReceiveUnitOption? _selectedUnit;
+
+    partial void OnSelectedUnitChanged(ReceiveUnitOption? value)
+    {
+        if (value is null || value.ProductUnitId == ProductUnitId) return;
+        ProductUnitId = value.ProductUnitId;
+        UnitName = value.UnitName;
+        UnitFactor = value.UnitFactor;
+        ReferencePurchasePrice = value.PurchasePrice;
+
+        if (!_isManualPrice || _manualPriceUnitId != value.ProductUnitId)
+        {
+            if (value.PurchasePrice > 0m)
+            {
+                _suppressManualPriceTracking = true;
+                try
+                {
+                    UnitPrice = value.PurchasePrice;
+                }
+                finally
+                {
+                    _suppressManualPriceTracking = false;
+                }
+            }
+        }
+
+        Recalculate();
+        OnPropertyChanged(nameof(HasPriceDiscrepancy));
+        OnPropertyChanged(nameof(PriceDiscrepancyText));
+        _onUpdated?.Invoke();
+    }
+
+    [ObservableProperty] private decimal _quantity = 1m;
+    [ObservableProperty] private string _quantityInput = "1";
+
+    [ObservableProperty] private decimal _unitPrice;
+    [ObservableProperty] private string _unitPriceInput = "0";
+
+    [ObservableProperty] private decimal _lineTotal;
+    [ObservableProperty] private decimal _baseQuantity;
+
+    private Action? _onUpdated;
+    public void WireHandlers(Action onUpdated) => _onUpdated = onUpdated;
+
+    partial void OnQuantityChanged(decimal value)
+    {
+        var text = Rounding.QuantityText(value);
+        if (_quantityInput != text)
+        {
+            _quantityInput = text;
+            OnPropertyChanged(nameof(QuantityInput));
+        }
+        OnPropertyChanged(nameof(QuantityText));
+        Recalculate();
+        _onUpdated?.Invoke();
+    }
+
+    partial void OnQuantityInputChanged(string value)
+    {
+        if (decimal.TryParse(value, NumberStyles.Any, CultureInfo.CurrentCulture, out var parsed) ||
+            decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out parsed))
+        {
+            if (parsed > 0m && parsed != _quantity)
+            {
+                _quantity = parsed;
+                OnPropertyChanged(nameof(Quantity));
+                OnPropertyChanged(nameof(QuantityText));
+                Recalculate();
+                _onUpdated?.Invoke();
+            }
+        }
+    }
+
+    partial void OnUnitPriceChanged(decimal value)
+    {
+        if (!_suppressManualPriceTracking)
+        {
+            _isManualPrice = true;
+            _manualPriceUnitId = ProductUnitId;
+        }
+
+        var text = value > 0 ? value.ToString("0.##") : "0";
+        if (_unitPriceInput != text)
+        {
+            _unitPriceInput = text;
+            OnPropertyChanged(nameof(UnitPriceInput));
+        }
+        OnPropertyChanged(nameof(UnitPriceText));
+        OnPropertyChanged(nameof(HasPriceDiscrepancy));
+        OnPropertyChanged(nameof(PriceDiscrepancyText));
+        Recalculate();
+        _onUpdated?.Invoke();
+    }
+
+    partial void OnUnitPriceInputChanged(string value)
+    {
+        if (decimal.TryParse(value, NumberStyles.Any, CultureInfo.CurrentCulture, out var parsed) ||
+            decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out parsed))
+        {
+            if (parsed >= 0m && parsed != _unitPrice)
+            {
+                _isManualPrice = true;
+                _manualPriceUnitId = ProductUnitId;
+                _unitPrice = parsed;
+                OnPropertyChanged(nameof(UnitPrice));
+                OnPropertyChanged(nameof(UnitPriceText));
+                OnPropertyChanged(nameof(HasPriceDiscrepancy));
+                OnPropertyChanged(nameof(PriceDiscrepancyText));
+                Recalculate();
+                _onUpdated?.Invoke();
+            }
+        }
+    }
+
+    partial void OnBaseQuantityChanged(decimal value) => OnPropertyChanged(nameof(BaseQuantityText));
+    partial void OnLineTotalChanged(decimal value) => OnPropertyChanged(nameof(LineTotalText));
+
+    public string QuantityText => Rounding.QuantityText(Quantity);
+    public string BaseQuantityText => $"{Rounding.QuantityText(BaseQuantity)} {UnitName}";
+    public string UnitPriceText => DashboardViewModel.Money(UnitPrice);
+    public string LineTotalText => DashboardViewModel.Money(LineTotal);
+
+    public void Recalculate()
+    {
+        BaseQuantity = Rounding.Quantity(Quantity * UnitFactor);
+        LineTotal = Rounding.LineTotal(Quantity, UnitPrice, 0m);
+    }
+}
+
 /// <summary>
 /// Receiving a supplier invoice. Posting creates one lot per line, writes the stock movements,
-/// moves the balances and records the payable — all in a single transaction, so a rejected line
-/// leaves nothing half-received.
+/// moves the balances and records the payable — all in a single transaction.
 /// </summary>
 public partial class ReceiveViewModel(IServiceProvider services) : ObservableObject
 {
@@ -35,22 +246,20 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
 
     private int _locationId;
 
-    public ObservableCollection<PartyRow> Suppliers { get; } = [];
+    public ObservableCollection<SupplierOption> Suppliers { get; } = [];
 
-    public ObservableCollection<ProductRow> Products { get; } = [];
+    public ObservableCollection<ReceiveProductOption> Products { get; } = [];
 
-    public ObservableCollection<UnitRow> Units { get; } = [];
+    public ObservableCollection<ReceiveProductOption> FilteredProducts { get; } = [];
 
     public ObservableCollection<ReceiveLine> Lines { get; } = [];
 
-    [ObservableProperty] private PartyRow? _selectedSupplier;
-    [ObservableProperty] private ProductRow? _selectedProduct;
-    [ObservableProperty] private UnitRow? _selectedUnit;
-    [ObservableProperty] private string _quantity = "1";
-    [ObservableProperty] private string _unitPrice = string.Empty;
+    [ObservableProperty] private SupplierOption? _selectedSupplier;
+    [ObservableProperty] private string _productSearchText = string.Empty;
     [ObservableProperty] private string _invoiceNo = string.Empty;
     [ObservableProperty] private string _status = "اختار المورد وابدأ الاستلام";
     [ObservableProperty] private bool _busy;
+    [ObservableProperty] private bool _isClearConfirmVisible;
 
     [ObservableProperty] private decimal _total;
     [ObservableProperty] private bool _canPost;
@@ -60,15 +269,11 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
 
     public async Task LoadAsync()
     {
-        // Total and CanPost are derived from the lines. Recomputing from the collection
-        // itself means no place that touches a line can be forgotten — every mutation,
-        // including ones added later, keeps the save button in step.
         if (!_watchingLines)
         {
             _watchingLines = true;
             Lines.CollectionChanged += (_, _) => Recalculate();
         }
-
 
         using var scope = _services.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
@@ -80,13 +285,27 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
             .FirstOrDefaultAsync();
 
         Suppliers.Clear();
-        foreach (var party in await ctx.Parties
-                     .Where(p => p.IsSupplier && p.Status != PartyStatus.Archived)
-                     .OrderBy(p => p.Name)
-                     .ToListAsync())
+        var parties = await ctx.Parties
+            .AsNoTracking()
+            .Where(p => p.IsSupplier && p.Status != PartyStatus.Archived)
+            .OrderBy(p => p.Name)
+            .ToListAsync();
+
+        var balances = await ctx.PartyAccountTransactions
+            .AsNoTracking()
+            .Where(t => parties.Select(p => p.Id).Contains(t.PartyId))
+            .GroupBy(t => t.PartyId)
+            .Select(g => new { PartyId = g.Key, Balance = g.Sum(t => t.Amount) })
+            .ToDictionaryAsync(g => g.PartyId, g => g.Balance);
+
+        foreach (var party in parties)
         {
-            Suppliers.Add(new PartyRow(party.Id, party.Name));
+            var bal = balances.GetValueOrDefault(party.Id, 0m);
+            Suppliers.Add(new SupplierOption(party.Id, party.Name, bal));
         }
+
+        if (SelectedSupplier is null)
+            SelectedSupplier = Suppliers.FirstOrDefault();
 
         Status = _locationId == 0
             ? "مفيش مخزن — أضف مخزن من الإعدادات"
@@ -99,12 +318,6 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
         await Settlement.LoadAsync();
     }
 
-
-    /// <summary>
-    /// Gives the receipt a reference before it is typed, so the field is never blank and two
-    /// deliveries cannot end up with the same one. The manager can still overwrite it with
-    /// the supplier's own number.
-    /// </summary>
     private async Task FillInvoiceNoAsync(DaftarContext ctx)
     {
         if (!string.IsNullOrWhiteSpace(InvoiceNo))
@@ -117,83 +330,146 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
 
     private async Task ReloadProductsAsync(DaftarContext ctx)
     {
-        var keep = SelectedProduct?.Id;
+        var active = await ctx.Products
+            .AsNoTracking()
+            .Include(p => p.Units)
+            .Where(p => p.IsActive)
+            .OrderBy(p => p.Name)
+            .ToListAsync();
+
+        var productIds = active.Select(p => p.Id).ToArray();
+
+        var stockRows = await ctx.StockBalances
+            .AsNoTracking()
+            .Include(b => b.Lot)
+            .Where(b => b.LocationId == _locationId && productIds.Contains(b.Lot!.ProductId))
+            .ToListAsync();
+
+        var stockByProduct = stockRows
+            .GroupBy(b => b.Lot!.ProductId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var latestPurchaseByProduct = (await ctx.PurchaseItems
+                .AsNoTracking()
+                .Where(pi => productIds.Contains(pi.ProductId))
+                .OrderByDescending(pi => pi.Id)
+                .ToListAsync())
+            .GroupBy(pi => pi.ProductId)
+            .ToDictionary(g => g.Key, g => g.First());
 
         Products.Clear();
-        foreach (var product in await ctx.Products
-                     .Where(p => p.IsActive)
-                     .OrderBy(p => p.Name)
-                     .ToListAsync())
+        foreach (var product in active)
         {
-            Products.Add(new ProductRow(product.Id, product.Sku, product.Name));
+            var activeUnits = product.Units
+                .Where(u => u.IsActive)
+                .OrderBy(u => u.IsDefaultPurchase ? 0 : u.IsBase ? 1 : 2)
+                .ToList();
+
+            if (activeUnits.Count == 0) continue;
+
+            stockByProduct.TryGetValue(product.Id, out var rows);
+
+            var option = new ReceiveProductOption(product.Id, product.Sku ?? string.Empty, product.Name);
+
+            foreach (var unit in activeUnits)
+            {
+                var onHand = rows is not null && rows.Count > 0
+                    ? Rounding.Quantity(rows.Sum(b => b.Quantity / unit.Factor))
+                    : 0m;
+
+                decimal purchasePrice = unit.PurchasePrice;
+                if (purchasePrice <= 0m && latestPurchaseByProduct.TryGetValue(product.Id, out var latestPurchase))
+                {
+                    var factorRatio = latestPurchase.UnitFactor > 0 ? unit.Factor / latestPurchase.UnitFactor : 1m;
+                    purchasePrice = Rounding.Amount(latestPurchase.UnitPrice * factorRatio);
+                }
+
+                option.AvailableUnits.Add(new ReceiveUnitOption(
+                    unit.Id, unit.Name, unit.Factor, purchasePrice, onHand));
+            }
+
+            var defUnit = activeUnits.FirstOrDefault(u => u.IsDefaultPurchase) ?? activeUnits.FirstOrDefault();
+            option.SelectedUnit = option.AvailableUnits.FirstOrDefault(u => u.ProductUnitId == defUnit?.Id)
+                               ?? option.AvailableUnits.FirstOrDefault();
+
+            Products.Add(option);
         }
 
-        var next = Products.FirstOrDefault(p => p.Id == keep) ?? Products.FirstOrDefault();
-        if (next is not null)
-            SelectedProduct = next;
-        else
-            await ReloadUnitsAsync(ctx);
+        ApplyProductFilter();
     }
 
-    private async Task ReloadUnitsAsync(DaftarContext ctx)
+    partial void OnProductSearchTextChanged(string value) => ApplyProductFilter();
+
+    private void ApplyProductFilter()
     {
-        Units.Clear();
-
-        if (SelectedProduct is null)
-            return;
-
-        foreach (var unit in await ctx.ProductUnits
-                     .Where(u => u.ProductId == SelectedProduct.Id && u.IsActive)
-                     .OrderByDescending(u => u.IsDefaultPurchase)
-                     .ThenByDescending(u => u.IsBase)
-                     .ToListAsync())
+        FilteredProducts.Clear();
+        var search = ProductSearchText.Trim();
+        var hasSearch = !string.IsNullOrWhiteSpace(search);
+        foreach (var p in Products)
         {
-            Units.Add(new UnitRow(
-                unit.Id, unit.Name, unit.Factor, unit.IsBase, unit.IsDefaultPurchase));
+            if (!hasSearch
+                || p.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || p.Sku.Contains(search, StringComparison.OrdinalIgnoreCase))
+            {
+                FilteredProducts.Add(p);
+            }
         }
-
-        SelectedUnit = Units.FirstOrDefault(u => u.IsDefaultPurchase) ?? Units.FirstOrDefault();
-    }
-
-    partial void OnSelectedProductChanged(ProductRow? value) => _ = ReloadUnitsSafeAsync();
-
-    private async Task ReloadUnitsSafeAsync()
-    {
-        using var scope = _services.CreateScope();
-        await ReloadUnitsAsync(scope.ServiceProvider.GetRequiredService<DaftarContext>());
     }
 
     [RelayCommand]
-    private async Task AddLineAsync()
+    private void SubmitSearch()
     {
-        if (SelectedSupplier is null)
+        if (string.IsNullOrWhiteSpace(ProductSearchText)) return;
+
+        var search = ProductSearchText.Trim();
+        var match = Products.FirstOrDefault(p => string.Equals(p.Sku, search, StringComparison.OrdinalIgnoreCase))
+                    ?? FilteredProducts.FirstOrDefault(p => string.Equals(p.Sku, search, StringComparison.OrdinalIgnoreCase))
+                    ?? Products.FirstOrDefault(p => string.Equals(p.Name, search, StringComparison.OrdinalIgnoreCase))
+                    ?? FilteredProducts.FirstOrDefault();
+
+        if (match is not null)
         {
-            Status = "اختار المورد الأول";
-            return;
+            AddProductToLines(match);
+        }
+        else
+        {
+            Status = $"لم يتم العثور على صنف بالباركود: {search}";
         }
 
-        if (SelectedProduct is null || SelectedUnit is null)
-        {
-            Status = "اختار الصنف والوحدة";
-            return;
-        }
+        ProductSearchText = string.Empty;
+    }
 
-        if (!decimal.TryParse(Quantity, NumberStyles.Any, CultureInfo.InvariantCulture, out var qty) || qty <= 0m)
+    private ReceiveProductOption? _selectedProduct;
+    public ReceiveProductOption? SelectedProduct
+    {
+        get => _selectedProduct;
+        set
         {
-            Status = "الكمية لازم تكون رقم أكبر من صفر";
-            return;
+            _selectedProduct = value;
+            OnPropertyChanged(nameof(SelectedProduct));
+            OnPropertyChanged(nameof(Units));
+            SelectedUnit = value?.SelectedUnit;
         }
+    }
 
-        if (!decimal.TryParse(UnitPrice, NumberStyles.Any, CultureInfo.InvariantCulture, out var price) || price < 0m)
-        {
-            Status = "السعر لازم يكون رقم صحيح";
-            return;
-        }
+    [ObservableProperty] private ReceiveUnitOption? _selectedUnit;
+    [ObservableProperty] private string _quantity = "1";
+    [ObservableProperty] private string _unitPrice = "0";
 
-        // The same product in the same unit entered twice is one line, so quantities merge.
+    public ObservableCollection<ReceiveUnitOption> Units => SelectedProduct?.AvailableUnits ?? [];
+
+    [RelayCommand]
+    public Task AddLineAsync()
+    {
+        if (SelectedProduct is null) return Task.CompletedTask;
+        var unit = SelectedUnit ?? SelectedProduct.SelectedUnit;
+        if (unit is null) return Task.CompletedTask;
+
+        var qty = decimal.TryParse(Quantity, out var q) ? q : 1m;
+        var price = decimal.TryParse(UnitPrice, out var p) ? p : unit.PurchasePrice;
+
         var existing = Lines.FirstOrDefault(l =>
-            l.ProductId == SelectedProduct.Id
-            && l.ProductUnitId == SelectedUnit.Id);
+            l.ProductId == SelectedProduct.ProductId && l.ProductUnitId == unit.ProductUnitId);
 
         if (existing is not null)
         {
@@ -201,45 +477,140 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
         }
         else
         {
-            Lines.Add(new ReceiveLine
+            var line = new ReceiveLine
             {
-                ProductId = SelectedProduct.Id,
-                ProductUnitId = SelectedUnit.Id,
+                ProductId = SelectedProduct.ProductId,
+                ProductUnitId = unit.ProductUnitId,
                 Sku = SelectedProduct.Sku,
                 ProductName = SelectedProduct.Name,
-                UnitName = SelectedUnit.Name,
-                UnitFactor = SelectedUnit.Factor,
+                UnitName = unit.UnitName,
+                UnitFactor = unit.UnitFactor,
                 Quantity = qty,
                 UnitPrice = price,
-            });
+                ReferencePurchasePrice = unit.PurchasePrice,
+            };
+
+            foreach (var u in SelectedProduct.AvailableUnits)
+                line.AvailableUnits.Add(u);
+
+            line.SelectedUnit = unit;
+            line.WireHandlers(() => Recalculate());
+            Lines.Add(line);
         }
 
         Recalculate();
-        Status = "تمت إضافة السطر";
+        return Task.CompletedTask;
+    }
 
-        Quantity = "1";
-        UnitPrice = string.Empty;
+    [RelayCommand]
+    private void SelectProduct(ReceiveProductOption? product)
+    {
+        if (product is null) return;
+        AddProductToLines(product);
+    }
+
+    [RelayCommand]
+    private void AddProductToLines(ReceiveProductOption? product)
+    {
+        if (product is null) return;
+        var unit = product.SelectedUnit;
+        if (unit is null) return;
+
+        var existing = Lines.FirstOrDefault(l =>
+            l.ProductId == product.ProductId
+            && l.ProductUnitId == unit.ProductUnitId);
+
+        if (existing is not null)
+        {
+            existing.Quantity += 1m;
+            Status = $"تمت زيادة كمية {product.Name} إلى {existing.QuantityText}";
+        }
+        else
+        {
+            var line = new ReceiveLine
+            {
+                ProductId = product.ProductId,
+                ProductUnitId = unit.ProductUnitId,
+                Sku = product.Sku,
+                ProductName = product.Name,
+                UnitName = unit.UnitName,
+                UnitFactor = unit.UnitFactor,
+                Quantity = 1m,
+                UnitPrice = unit.PurchasePrice,
+                ReferencePurchasePrice = unit.PurchasePrice,
+            };
+
+            foreach (var u in product.AvailableUnits)
+                line.AvailableUnits.Add(u);
+
+            line.SelectedUnit = unit;
+            line.WireHandlers(() => Recalculate());
+
+            Lines.Add(line);
+            Status = $"تمت إضافة {product.Name} ({unit.UnitName}) للاستلام";
+        }
+
+        Recalculate();
+    }
+
+    [RelayCommand]
+    private void IncrementLine(ReceiveLine? line)
+    {
+        if (line is null) return;
+        line.Quantity += 1m;
+        Recalculate();
+    }
+
+    [RelayCommand]
+    private void DecrementLine(ReceiveLine? line)
+    {
+        if (line is null) return;
+        if (line.Quantity > 1m)
+        {
+            line.Quantity -= 1m;
+            Recalculate();
+        }
+        else
+        {
+            Lines.Remove(line);
+            Recalculate();
+        }
     }
 
     [RelayCommand]
     private void RemoveLine(ReceiveLine? line)
     {
-        if (line is null)
-            return;
-
+        if (line is null) return;
         Lines.Remove(line);
         Recalculate();
+    }
+
+    [RelayCommand]
+    private void RequestClear()
+    {
+        if (Lines.Count > 0 || HasScan)
+            IsClearConfirmVisible = true;
+    }
+
+    [RelayCommand]
+    private void CancelClear()
+    {
+        IsClearConfirmVisible = false;
     }
 
     [RelayCommand]
     private void Clear()
     {
         Lines.Clear();
+        Scanned.Clear();
+        HasScan = false;
+        ScanStatus = string.Empty;
+        IsClearConfirmVisible = false;
+        Settlement.Reset();
         Recalculate();
         Status = "تم تفريغ الاستلام";
     }
 
-    /// <summary>Two decimals, matching the till and the dashboard.</summary>
     public string TotalText => DashboardViewModel.Money(Total);
 
     private void Recalculate()
@@ -248,8 +619,6 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
         OnPropertyChanged(nameof(TotalText));
         CanPost = SelectedSupplier is not null && Lines.Count > 0 && Total > 0m && !Busy;
 
-        // A disabled save button with lines on screen and no reason given looks broken. Say what
-        // is actually missing.
         PostHint = Lines.Count == 0 || CanPost
             ? string.Empty
             : SelectedSupplier is null
@@ -259,7 +628,7 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
                     : string.Empty;
     }
 
-    partial void OnSelectedSupplierChanged(PartyRow? value) => Recalculate();
+    partial void OnSelectedSupplierChanged(SupplierOption? value) => Recalculate();
     partial void OnTotalChanged(decimal value) => Recalculate();
     partial void OnBusyChanged(bool value) => Recalculate();
 
@@ -268,6 +637,28 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
     {
         if (!CanPost || SelectedSupplier is null)
             return;
+
+        // Detect conflicting proposed reference prices for the same ProductUnitId
+        var approvedUpdates = Lines
+            .Where(l => l.UpdateProductPurchasePrice && l.UnitPrice > 0m)
+            .ToList();
+
+        var conflicts = approvedUpdates
+            .GroupBy(l => l.ProductUnitId)
+            .Where(g => g.Select(x => x.UnitPrice).Distinct().Count() > 1)
+            .ToList();
+
+        if (conflicts.Count > 0)
+        {
+            var firstConflict = conflicts.First();
+            var conflictPrices = string.Join(" و ", firstConflict.Select(x => $"{x.UnitPrice:N2} ج.م").Distinct());
+            Status = $"تعارض في تحديث سعر الشراء للوحدة '{firstConflict.First().UnitName}': أسعار مختلفة معتمدة ({conflictPrices}). يرجى توحيد السعر.";
+            return;
+        }
+
+        var updatesToApply = approvedUpdates
+            .GroupBy(l => l.ProductUnitId)
+            .ToDictionary(g => g.Key, g => g.First());
 
         Busy = true;
         Recalculate();
@@ -280,60 +671,94 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
             using var scope = _services.CreateScope();
             var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
 
-            var today = DateOnly.FromDateTime(DateTime.Now);
-
-            var purchase = new Purchase
+            await using IDbContextTransaction tx = await TransactionScope.BeginAsync(ctx, default);
+            try
             {
-                Type = PurchaseType.Invoice,
-                SupplierId = SelectedSupplier.Id,
-                LocationId = _locationId,
-                DocDate = today,
-                SupplierInvoiceNo = string.IsNullOrWhiteSpace(InvoiceNo) ? null : InvoiceNo.Trim(),
-                Notes = "استلام من شاشة الاستلام",
-            };
+                var today = DateOnly.FromDateTime(DateTime.Now);
 
-            ctx.Purchases.Add(purchase);
-            await ctx.SaveChangesAsync();
+                var purchase = new Purchase
+                {
+                    Type = PurchaseType.Invoice,
+                    SupplierId = SelectedSupplier.Id,
+                    LocationId = _locationId,
+                    DocDate = today,
+                    SupplierInvoiceNo = string.IsNullOrWhiteSpace(InvoiceNo) ? null : InvoiceNo.Trim(),
+                    Notes = "استلام من شاشة الاستلام",
+                };
 
-            foreach (var line in Lines)
-            {
-                var product = await ctx.Products.FirstAsync(p => p.Id == line.ProductId);
-                var unit = await ctx.ProductUnits.FirstAsync(u => u.Id == line.ProductUnitId);
+                ctx.Purchases.Add(purchase);
+                await ctx.SaveChangesAsync();
 
-                purchase.AddItem(
-                    product, unit,
-                    quantity: line.Quantity,
-                    unitPrice: line.UnitPrice);
+                foreach (var line in Lines)
+                {
+                    var product = await ctx.Products.FirstAsync(p => p.Id == line.ProductId);
+                    var unit = await ctx.ProductUnits.FirstAsync(u => u.Id == line.ProductUnitId);
+
+                    purchase.AddItem(
+                        product, unit,
+                        quantity: line.Quantity,
+                        unitPrice: line.UnitPrice);
+                }
+
+                await ctx.SaveChangesAsync();
+
+                var result = await new PurchasePostingService(ctx).PostAsync(purchase.Id, userId: 1, today);
+
+                await Settlement.ApplyAsync(
+                    ctx,
+                    PaymentDirection.Out,
+                    purchase.SupplierId,
+                    saleId: null,
+                    purchaseId: purchase.Id,
+                    total: purchase.Total,
+                    today,
+                    userId: 1);
+
+                // Apply approved reference price updates inside the same transaction
+                if (updatesToApply.Count > 0)
+                {
+                    var unitIds = updatesToApply.Keys.ToList();
+                    var unitsToUpdate = await ctx.ProductUnits
+                        .Where(u => unitIds.Contains(u.Id))
+                        .ToListAsync();
+
+                    foreach (var (unitId, line) in updatesToApply)
+                    {
+                        var unit = unitsToUpdate.FirstOrDefault(u => u.Id == unitId)
+                            ?? throw new DomainException($"الوحدة رقم {unitId} غير موجودة في قاعدة البيانات.");
+
+                        if (unit.ProductId != line.ProductId)
+                            throw new DomainException($"الوحدة '{unit.Name}' لا تنتمي للصنف المحدد.");
+
+                        if (unit.PurchasePrice != line.UnitPrice)
+                        {
+                            unit.PurchasePrice = Rounding.Amount(line.UnitPrice);
+                            unit.Validate();
+                        }
+                    }
+
+                    await ctx.SaveChangesAsync();
+                }
+
+                await TransactionScope.CommitAsync(tx, ctx, default);
+
+                var paid = Settlement.Settlement == SettlementChoice.Deferred
+                    ? "آجل"
+                    : $"مدفوع {DashboardViewModel.Money(Settlement.AmountFor(purchase.Total))}";
+
+                Status = $"تم الاستلام — {result.DocNo} · {postedLines} سطر · {paid} · الإجمالي {DashboardViewModel.Money(Total)}";
+
+                Lines.Clear();
+                InvoiceNo = string.Empty;
+                Settlement.Reset();
+                Recalculate();
+                await LoadAsync();
             }
-
-            await ctx.SaveChangesAsync();
-
-            // Paid or not, receiving makes us owe the supplier. The voucher is what reduces it.
-            var result = await new PurchasePostingService(ctx).PostAsync(purchase.Id, userId: 1, today);
-
-            await Settlement.ApplyAsync(
-                ctx,
-                PaymentDirection.Out,
-                purchase.SupplierId,
-                saleId: null,
-                purchaseId: purchase.Id,
-                total: purchase.Total,
-                today,
-                userId: 1);
-
-            var paid = Settlement.Settlement == SettlementChoice.Deferred
-                ? "آجل"
-                : $"مدفوع {DashboardViewModel.Money(Settlement.AmountFor(purchase.Total))}";
-
-            Status = $"تم الاستلام — {result.DocNo} · {postedLines} سطر · {paid} · الإجمالي {DashboardViewModel.Money(Total)}";
-
-            Lines.Clear();
-
-            // Cleared so FillInvoiceNoAsync hands out the next reference for today.
-            InvoiceNo = string.Empty;
-            Settlement.Reset();
-            Recalculate();
-            await LoadAsync();
+            catch
+            {
+                await TransactionScope.RollbackAsync(tx, ctx, default);
+                throw;
+            }
         }
         catch (Exception ex)
         {
@@ -344,53 +769,5 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
             Busy = false;
             Recalculate();
         }
-    }
-}
-
-/// <summary>One line of a supplier invoice being built.</summary>
-public partial class ReceiveLine : ObservableObject
-{
-    public int ProductId { get; init; }
-    public int ProductUnitId { get; init; }
-    public string Sku { get; init; } = string.Empty;
-    public string ProductName { get; init; } = string.Empty;
-    public string UnitName { get; init; } = string.Empty;
-    public decimal UnitFactor { get; init; } = 1m;
-    [ObservableProperty] private decimal _quantity;
-    [ObservableProperty] private decimal _unitPrice;
-    [ObservableProperty] private decimal _lineTotal;
-
-    /// <summary>Base units this line actually moves — what the balance will change by.</summary>
-    [ObservableProperty] private decimal _baseQuantity;
-
-    partial void OnBaseQuantityChanged(decimal value)
-        => OnPropertyChanged(nameof(BaseQuantityText));
-
-    partial void OnQuantityChanged(decimal value)
-    {
-        OnPropertyChanged(nameof(QuantityText));
-        Recalculate();
-    }
-
-    partial void OnUnitPriceChanged(decimal value)
-    {
-        OnPropertyChanged(nameof(UnitPriceText));
-        Recalculate();
-    }
-
-    partial void OnLineTotalChanged(decimal value) => OnPropertyChanged(nameof(LineTotalText));
-
-    public string UnitPriceText => DashboardViewModel.Money(UnitPrice);
-
-    public string LineTotalText => DashboardViewModel.Money(LineTotal);
-
-    public string QuantityText => Domain.Shared.Rounding.QuantityText(Quantity);
-
-    public string BaseQuantityText => Domain.Shared.Rounding.QuantityText(BaseQuantity);
-
-    private void Recalculate()
-    {
-        BaseQuantity = Rounding.Quantity(Quantity * UnitFactor);
-        LineTotal = Rounding.LineTotal(Quantity, UnitPrice, 0m);
     }
 }

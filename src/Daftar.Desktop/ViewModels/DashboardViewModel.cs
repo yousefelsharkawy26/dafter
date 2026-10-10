@@ -23,6 +23,16 @@ namespace Daftar.ViewModels;
 public partial class DashboardViewModel(IServiceProvider services) : ObservableObject
 {
     private readonly IServiceProvider _services = services;
+    private readonly Daftar.Services.INavigationService? _navigation = services.GetService<Daftar.Services.INavigationService>();
+
+    [RelayCommand]
+    public void OpenTab(string? key)
+    {
+        if (!string.IsNullOrWhiteSpace(key))
+        {
+            _navigation?.Navigate(key);
+        }
+    }
 
     /// <summary>Parties who owe us.</summary>
     public ObservableCollection<ReceivableRow> Receivables { get; } = [];
@@ -141,7 +151,9 @@ public partial class DashboardViewModel(IServiceProvider services) : ObservableO
 
         RecentSales.Clear();
         foreach (var sale in await ctx.Sales
-                     .Where(s => s.Status == DocumentStatus.Posted)
+                     .Include(s => s.Items)
+                     .Where(s => s.Status == DocumentStatus.Posted
+                              && s.Type == Domain.Sales.SaleType.Invoice)
                      .OrderByDescending(s => s.Id)
                      .Take(8)
                      .ToListAsync())

@@ -265,19 +265,28 @@ public sealed class IntegrityChecker(DaftarContext context)
     {
         var issued = new List<string>();
 
-        issued.AddRange(await context.Sales
-            .Where(s => s.DocNo != null).Select(s => s.DocNo!).ToListAsync(ct));
-        issued.AddRange(await context.Purchases
-            .Where(p => p.DocNo != null).Select(p => p.DocNo!).ToListAsync(ct));
-        issued.AddRange(await context.Payments
-            .Where(p => p.DocNo != null).Select(p => p.DocNo!).ToListAsync(ct));
-
-        if (docType is Shared.DocumentType.Transfer or Shared.DocumentType.Count)
+        if (docType == Shared.DocumentType.Party)
         {
-            issued.AddRange(await context.StockTransfers
-                .Where(t => t.DocNo != null).Select(t => t.DocNo!).ToListAsync(ct));
-            issued.AddRange(await context.StockCounts
-                .Where(c => c.DocNo != null).Select(c => c.DocNo!).ToListAsync(ct));
+            // Party codes are stored in Parties.Code, not in the transactional tables.
+            issued.AddRange(await context.Parties
+                .Where(p => p.Code != null).Select(p => p.Code!).ToListAsync(ct));
+        }
+        else
+        {
+            issued.AddRange(await context.Sales
+                .Where(s => s.DocNo != null).Select(s => s.DocNo!).ToListAsync(ct));
+            issued.AddRange(await context.Purchases
+                .Where(p => p.DocNo != null).Select(p => p.DocNo!).ToListAsync(ct));
+            issued.AddRange(await context.Payments
+                .Where(p => p.DocNo != null).Select(p => p.DocNo!).ToListAsync(ct));
+
+            if (docType is Shared.DocumentType.Transfer or Shared.DocumentType.Count)
+            {
+                issued.AddRange(await context.StockTransfers
+                    .Where(t => t.DocNo != null).Select(t => t.DocNo!).ToListAsync(ct));
+                issued.AddRange(await context.StockCounts
+                    .Where(c => c.DocNo != null).Select(c => c.DocNo!).ToListAsync(ct));
+            }
         }
 
         var highest = issued

@@ -92,15 +92,12 @@ public sealed class ReceiveScreenTests : IAsyncLifetime, IDisposable
         Assert.Contains(receive.Suppliers, s => s.Id == supplier.Id);
         receive.SelectedSupplier = receive.Suppliers.Single(s => s.Id == supplier.Id);
 
-        receive.SelectedProduct = receive.Products.Single(p => p.Sku == "OLIVE-1");
-        receive.SelectedUnit = receive.Units.Single(u => u.Name == "زجاجة");
-
-        receive.Quantity = "3";
-        receive.UnitPrice = "70";
-
-        await receive.AddLineCommand.ExecuteAsync(null);
+        var prodOpt = receive.Products.Single(p => p.Sku == "OLIVE-1");
+        receive.SelectProductCommand.Execute(prodOpt);
 
         var line = Assert.Single(receive.Lines);
+        line.Quantity = 3m;
+        line.UnitPrice = 70m;
         Assert.Equal(210m, line.LineTotal);
         Assert.Equal(3m, line.BaseQuantity); // one bottle is the base unit
         Assert.True(receive.CanPost);
@@ -145,13 +142,12 @@ public sealed class ReceiveScreenTests : IAsyncLifetime, IDisposable
         var receive = new ReceiveViewModel(_fixture.Services);
         await receive.LoadAsync();
         receive.SelectedSupplier = receive.Suppliers.Single(s => s.Id == supplier.Id);
-        receive.SelectedProduct = receive.Products.Single(p => p.Sku == "MILK-1");
-        receive.SelectedUnit = receive.Units.Single();
+        var prodOpt = receive.Products.Single(p => p.Sku == "MILK-1");
+        receive.SelectProductCommand.Execute(prodOpt);
 
-        receive.Quantity = "2";
-        receive.UnitPrice = "50";
-
-        await receive.AddLineCommand.ExecuteAsync(null);
+        var line = Assert.Single(receive.Lines);
+        line.Quantity = 2m;
+        line.UnitPrice = 50m;
 
         Assert.Single(receive.Lines);
         Assert.True(receive.CanPost);
@@ -179,20 +175,16 @@ public sealed class ReceiveScreenTests : IAsyncLifetime, IDisposable
         var receive = new ReceiveViewModel(_fixture.Services);
         await receive.LoadAsync();
         receive.SelectedSupplier = receive.Suppliers.Single(s => s.Id == supplier.Id);
-        receive.SelectedProduct = receive.Products.Single(p => p.Sku == "RICE-1");
-        receive.SelectedUnit = receive.Units.Single();
-
-        receive.Quantity = "2";
-        receive.UnitPrice = "40";
-        await receive.AddLineCommand.ExecuteAsync(null);
-
-        receive.Quantity = "3";
-        receive.UnitPrice = "40";
-        await receive.AddLineCommand.ExecuteAsync(null);
-
+        var prodOpt = receive.Products.Single(p => p.Sku == "RICE-1");
+        receive.SelectProductCommand.Execute(prodOpt);
         var line = Assert.Single(receive.Lines);
-        Assert.Equal(5m, line.Quantity);
-        Assert.Equal(200m, line.LineTotal);
+        line.Quantity = 2m;
+        line.UnitPrice = 40m;
+
+        receive.SelectProductCommand.Execute(prodOpt);
+
+        Assert.Equal(3m, line.Quantity);
+        Assert.Equal(120m, line.LineTotal);
     }
 
     [Fact]
@@ -233,11 +225,11 @@ public sealed class ReceiveScreenTests : IAsyncLifetime, IDisposable
 
         await receive.LoadAsync();
         receive.SelectedSupplier = receive.Suppliers.Single(s => s.Id == supplier.Id);
-        receive.SelectedProduct = receive.Products.Single(p => p.Sku == "TEA-1");
-        receive.SelectedUnit = receive.Units.Single();
-        receive.Quantity = "1";
-        receive.UnitPrice = "10";
-        await receive.AddLineCommand.ExecuteAsync(null);
+        var prodOpt = receive.Products.Single(p => p.Sku == "TEA-1");
+        receive.SelectProductCommand.Execute(prodOpt);
+        var line = Assert.Single(receive.Lines);
+        line.Quantity = 1m;
+        line.UnitPrice = 10m;
 
         Assert.True(receive.CanPost);
 

@@ -18,7 +18,10 @@ public sealed record SettlementResult(
     decimal CountedCash,
     decimal CashDifference,
     decimal StockShortageValue,
-    decimal CommissionAmount);
+    decimal CommissionAmount,
+    decimal CashSalesTotal = 0m,
+    decimal DebtCollectionsTotal = 0m,
+    decimal CreditSalesTotal = 0m);
 
 /// <summary>
 /// The distributor day, end to end.
@@ -94,6 +97,64 @@ public sealed class DistributorSessionService(
     }
 
     /// <summary>
+    /// Returns unsold stock from the vehicle back to the warehouse.
+    /// If lines is null, all positive stock balances remaining on the vehicle are returned.
+    /// </summary>
+    public async Task<TransferPostingResult?> UnloadVehicleAsync(
+        int sessionId,
+        int warehouseLocationId,
+        IReadOnlyList<(int LotId, decimal BaseQuantity)>? lines = null,
+        int userId = 1,
+        DateOnly? businessDate = null,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await context.DistributorSessions
+            .FirstOrDefaultAsync(s => s.Id == sessionId, cancellationToken)
+            ?? throw new DomainException($"Session {sessionId} does not exist.");
+
+        var distributor = await context.Distributors
+            .FirstAsync(d => d.Id == session.DistributorId, cancellationToken);
+
+        List<(int LotId, decimal BaseQuantity)> itemsToReturn;
+        if (lines is not null)
+        {
+            itemsToReturn = lines.Where(l => l.BaseQuantity > 0).ToList();
+        }
+        else
+        {
+            var balances = await context.StockBalances
+                .Where(b => b.LocationId == distributor.StockLocationId && b.Quantity > 0)
+                .ToListAsync(cancellationToken);
+            itemsToReturn = balances.Select(b => (b.LotId, b.Quantity)).ToList();
+        }
+
+        if (itemsToReturn.Count == 0)
+            return null;
+
+        var date = businessDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var transfer = new StockTransfer
+        {
+            FromLocationId = distributor.StockLocationId,
+            ToLocationId = warehouseLocationId,
+            DistributorSessionId = sessionId,
+            DocDate = date,
+            Notes = $"تفريغ مرتجع بضاعة متبقية من جولة #{sessionId} للمستودع",
+        };
+        context.StockTransfers.Add(transfer);
+        await context.SaveChangesAsync(cancellationToken);
+
+        foreach (var (lotId, quantity) in itemsToReturn)
+        {
+            var lot = await context.Lots.FirstOrDefaultAsync(l => l.Id == lotId, cancellationToken)
+                ?? throw new DomainException($"Lot {lotId} does not exist.");
+            transfer.AddItem(lot, quantity);
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+        return await transfers.PostAsync(transfer.Id, userId, date, cancellationToken);
+    }
+
+    /// <summary>
     /// Settles the session in one transaction: count the vehicle, count the cash, write the
     /// shortage adjustment, take his commission, and record the whole snapshot on the session.
     /// </summary>
@@ -150,10 +211,13 @@ public sealed class DistributorSessionService(
             var count = await counts.BeginAsync(
                 distributor.StockLocationId, today, userId, sessionId, cancellationToken);
 
-            if (countedQuantities is not null)
+            foreach (var item in count.Items)
             {
-                foreach (var (lotId, counted) in countedQuantities)
-                    await counts.RecordCountAsync(count.Id, lotId, counted, cancellationToken);
+                var counted = (countedQuantities is not null && countedQuantities.TryGetValue(item.LotId, out var val))
+                    ? val
+                    : item.SystemQty;
+
+                await counts.RecordCountAsync(count.Id, item.LotId, counted, cancellationToken);
             }
 
             var countResult = await counts.PostAsync(count.Id, userId, cancellationToken);
@@ -172,18 +236,29 @@ public sealed class DistributorSessionService(
         var returnsTotal = Rounding.Amount(sales
             .Where(s => s.Type == Domain.Sales.SaleType.Return).Sum(s => s.Total));
 
-        var collectionsTotal = Rounding.Amount(await context.Payments
+        var cashSalesTotal = Rounding.Amount(await context.Payments
             .Where(p => p.DistributorSessionId == sessionId
                      && p.Status == DocumentStatus.Posted
-                     && p.Direction == PaymentDirection.In)
+                     && p.Direction == PaymentDirection.In
+                     && p.SaleId != null)
             .Select(p => (decimal?)p.Amount)
             .SumAsync(cancellationToken) ?? 0m);
 
-        // 3. Expected cash is his custody balance, from the ledger rather than from memory.
-        var expectedCash = Rounding.Amount(await context.CashTransactions
-            .Where(t => t.CashAccountId == distributor.CashAccountId)
-            .Select(t => (decimal?)t.Amount)
+        var debtCollectionsTotal = Rounding.Amount(await context.Payments
+            .Where(p => p.DistributorSessionId == sessionId
+                     && p.Status == DocumentStatus.Posted
+                     && p.Direction == PaymentDirection.In
+                     && p.SaleId == null)
+            .Select(p => (decimal?)p.Amount)
             .SumAsync(cancellationToken) ?? 0m);
+
+        var creditSalesTotal = Rounding.Amount(Math.Max(0m, salesTotal - cashSalesTotal));
+        var collectionsTotal = Rounding.Amount(cashSalesTotal + debtCollectionsTotal);
+
+        // 3. Expected cash is strictly what was collected during THIS session:
+        //    Cash from sales + debt collections.
+        //    Previous session balances must never carry over into this session.
+        var expectedCash = collectionsTotal;
 
         var cashDifference = Rounding.Amount(countedCash - expectedCash);
 
@@ -215,7 +290,7 @@ public sealed class DistributorSessionService(
             {
                 CashAccountId = distributor.CashAccountId,
                 OccurredAt = DateTime.UtcNow,
-                BusinessDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                BusinessDate = today,
                 Kind = CashTransactionKind.Expense,
                 Amount = -commission,
                 Category = ExpenseCategory.Commission,
@@ -225,13 +300,53 @@ public sealed class DistributorSessionService(
             });
         }
 
+        // Hand over counted cash from custody to company cashier account upon session close
+        if (countedCash > 0m)
+        {
+            var mainCashAccount = await context.CashAccounts
+                .FirstOrDefaultAsync(a => a.Type == CashAccountType.Cash && a.IsActive, cancellationToken);
+
+            if (mainCashAccount is not null && mainCashAccount.Id != distributor.CashAccountId)
+            {
+                var transferRef = Guid.NewGuid().ToString("N");
+                var now = DateTime.UtcNow;
+
+                context.CashTransactions.Add(new CashTransaction
+                {
+                    CashAccountId = distributor.CashAccountId,
+                    OccurredAt = now,
+                    BusinessDate = today,
+                    Kind = CashTransactionKind.TransferOut,
+                    Amount = -countedCash,
+                    DistributorSessionId = sessionId,
+                    TransferRef = transferRef,
+                    Note = $"تسليم عهدة نقدية للجولة {sessionId} من {distributor.Name}",
+                    CreatedBy = userId,
+                });
+
+                context.CashTransactions.Add(new CashTransaction
+                {
+                    CashAccountId = mainCashAccount.Id,
+                    OccurredAt = now,
+                    BusinessDate = today,
+                    Kind = CashTransactionKind.TransferIn,
+                    Amount = countedCash,
+                    DistributorSessionId = sessionId,
+                    TransferRef = transferRef,
+                    Note = $"استلام عهدة نقدية للجولة {sessionId} من {distributor.Name}",
+                    CreatedBy = userId,
+                });
+            }
+        }
+
         await context.SaveChangesAsync(cancellationToken);
 
         return new SettlementResult(
             sessionId, countId, countDocNo,
             salesTotal, returnsTotal, collectionsTotal,
             expectedCash, Rounding.Amount(countedCash), cashDifference,
-            shortage, commission);
+            shortage, commission,
+            cashSalesTotal, debtCollectionsTotal, creditSalesTotal);
     }
 
     private async Task<DistributorSession> RequireOpenAsync(int sessionId, CancellationToken cancellationToken)

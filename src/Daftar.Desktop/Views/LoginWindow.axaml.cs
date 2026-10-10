@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
@@ -17,12 +18,21 @@ public partial class LoginWindow : Window
     public LoginWindow(LoginViewModel viewModel) : this()
     {
         _viewModel = viewModel;
-
-        // Set in the constructor, not on Opened: an unwired Opened handler means the DataContext
-        // is never assigned, every binding silently stays null, and both panels render at once.
         DataContext = viewModel;
 
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        Loaded += async (_, _) =>
+        {
+            await viewModel.InitializeAsync();
+            var usernameBox = this.FindControl<AutoCompleteBox>("UsernameBox");
+            var passwordBox = this.FindControl<TextBox>("PasswordBox");
+
+            if (string.IsNullOrWhiteSpace(viewModel.Username))
+                usernameBox?.Focus();
+            else
+                passwordBox?.Focus();
+        };
     }
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);

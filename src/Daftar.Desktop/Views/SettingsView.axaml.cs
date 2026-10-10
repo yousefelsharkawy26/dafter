@@ -5,11 +5,11 @@ using Daftar.ViewModels;
 
 namespace Daftar.Views;
 
-public partial class DashboardView : UserControl
+public partial class SettingsView : UserControl
 {
     private bool _loaded;
 
-    public DashboardView()
+    public SettingsView()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
@@ -19,11 +19,11 @@ public partial class DashboardView : UserControl
 
     private async void OnDataContextChanged(object? sender, EventArgs e)
     {
-        // Load once, when the view model arrives — TabHost creates views lazily.
-        if (_loaded || DataContext is not DashboardViewModel vm)
+        if (_loaded || DataContext is not SettingsViewModel vm)
             return;
 
         _loaded = true;
-        await vm.LoadAsync();
+        await vm.InitializeAsync();
     }
 }
+

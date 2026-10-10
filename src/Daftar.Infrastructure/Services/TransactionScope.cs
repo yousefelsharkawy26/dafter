@@ -9,7 +9,7 @@ namespace Daftar.Infrastructure.Services;
 /// BeginTransaction on one connection, so an inner service reuses the transaction the outer one
 /// opened and only the outermost commits or rolls back.
 /// </summary>
-internal static class TransactionScope
+public static class TransactionScope
 {
     public static async Task<IDbContextTransaction> BeginAsync(
         DbContext context,

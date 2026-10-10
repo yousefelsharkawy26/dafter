@@ -137,24 +137,45 @@ public partial class ReceiveViewModel
 
         var units = await ctx.ProductUnits
             .Where(u => u.IsActive)
-            .Select(u => new { u.Id, u.ProductId, u.Name, u.Factor, u.IsDefaultPurchase })
+            .Select(u => new { u.Id, u.ProductId, u.Name, u.Factor, u.IsDefaultPurchase, u.PurchasePrice })
             .ToListAsync();
+
+        var latestPurchaseByProduct = (await ctx.PurchaseItems
+                .AsNoTracking()
+                .OrderByDescending(pi => pi.Id)
+                .ToListAsync())
+            .GroupBy(pi => pi.ProductId)
+            .ToDictionary(g => g.Key, g => g.First());
 
         var entries = catalogue.Select(c => (c.Id, c.Sku, c.Name)).ToList();
 
         // Every row offers the whole catalogue, so a wrong match can be corrected without
         // reaching up the visual tree from inside a row template.
-        ObservableCollection<ProductRow> choices = [.. Products];
+        ObservableCollection<ProductRow> choices = [.. catalogue.Select(c => new ProductRow(c.Id, c.Sku, c.Name))];
 
         // Units per product, so choosing a product can pick its unit automatically.
         var unitsByProduct = units
             .GroupBy(u => u.ProductId)
             .ToDictionary(
                 g => g.Key,
-                g => new ObservableCollection<UnitRow>(g
-                    .Select(u => new UnitRow(
-                        u.Id, u.Name, u.Factor, IsBase: false, IsDefaultPurchase: u.IsDefaultPurchase))
-                    .OrderByDescending(u => u.IsDefaultPurchase)));
+                g =>
+                {
+                    latestPurchaseByProduct.TryGetValue(g.Key, out var lp);
+                    return new ObservableCollection<UnitRow>(g
+                        .Select(u =>
+                        {
+                            var price = u.PurchasePrice;
+                            if (price <= 0m && lp is not null)
+                            {
+                                var factorRatio = lp.UnitFactor > 0 ? u.Factor / lp.UnitFactor : 1m;
+                                price = Rounding.Amount(lp.UnitPrice * factorRatio);
+                            }
+                            return new UnitRow(
+                                u.Id, u.Name, u.Factor, IsBase: false, IsDefaultPurchase: u.IsDefaultPurchase,
+                                ProductId: u.ProductId, PurchasePrice: price);
+                        })
+                        .OrderByDescending(u => u.IsDefaultPurchase));
+                });
 
         foreach (var line in invoice.Lines)
         {
@@ -165,19 +186,15 @@ public partial class ReceiveViewModel
 
             if (best is not null)
             {
-                product = Products.FirstOrDefault(p => p.Id == best.ProductId);
+                product = choices.FirstOrDefault(p => p.Id == best.ProductId);
 
-                var productUnits = units
-                    .Where(u => u.ProductId == best.ProductId)
-                    .Select(u => new UnitRow(
-                        u.Id, u.Name, u.Factor, IsBase: false, IsDefaultPurchase: u.IsDefaultPurchase))
-                    .OrderByDescending(u => u.IsDefaultPurchase)
-                    .ToList();
-
-                unit = productUnits.FirstOrDefault();
+                if (product is not null && unitsByProduct.TryGetValue(product.Id, out var forProduct))
+                {
+                    unit = forProduct.FirstOrDefault(u => u.IsDefaultPurchase) ?? forProduct.FirstOrDefault();
+                }
             }
 
-            Scanned.Add(new ScannedRow
+            var row = new ScannedRow
             {
                 Choices = choices,
                 UnitsByProduct = unitsByProduct,
@@ -187,11 +204,27 @@ public partial class ReceiveViewModel
                 ScannedUnitPrice = line.UnitPrice,
                 ScannedTotal = line.Total,
                 MatchScore = best?.Score ?? 0,
-                Product = product,
-                Unit = unit,
                 Quantity = line.Quantity ?? 0m,
-                UnitPrice = line.UnitPrice ?? 0m,
-            });
+            };
+
+            row.Product = product;
+            if (unit is not null)
+                row.Unit = unit;
+
+            if (line.UnitPrice.HasValue && line.UnitPrice.Value > 0)
+            {
+                row.SetPriceInternal(line.UnitPrice.Value, PriceSource.Ocr);
+            }
+            else if (unit is not null && unit.PurchasePrice > 0m)
+            {
+                row.SetPriceInternal(unit.PurchasePrice, PriceSource.Reference);
+            }
+            else
+            {
+                row.SetPriceInternal(0m, PriceSource.None);
+            }
+
+            Scanned.Add(row);
         }
     }
 
@@ -213,9 +246,14 @@ public partial class ReceiveViewModel
                 l.ProductId == row.Product!.Id && l.ProductUnitId == row.Unit!.Id);
 
             if (existing is not null)
+            {
                 existing.Quantity += row.Quantity;
+                if (row.UpdateProductPurchasePrice)
+                    existing.UpdateProductPurchasePrice = true;
+            }
             else
-                Lines.Add(new ReceiveLine
+            {
+                var newLine = new ReceiveLine
                 {
                     ProductId = row.Product!.Id,
                     ProductUnitId = row.Unit!.Id,
@@ -225,7 +263,22 @@ public partial class ReceiveViewModel
                     UnitFactor = row.Unit.Factor,
                     Quantity = row.Quantity,
                     UnitPrice = row.UnitPrice,
-                });
+                    ReferencePurchasePrice = row.ReferencePurchasePrice,
+                    ScannedUnitPrice = row.ScannedUnitPrice,
+                    UpdateProductPurchasePrice = row.UpdateProductPurchasePrice,
+                };
+
+                var prodOpt = Products.FirstOrDefault(p => p.ProductId == row.Product.Id);
+                if (prodOpt is not null)
+                {
+                    foreach (var u in prodOpt.AvailableUnits)
+                        newLine.AvailableUnits.Add(u);
+                    newLine.SelectedUnit = newLine.AvailableUnits.FirstOrDefault(u => u.ProductUnitId == row.Unit.Id);
+                }
+
+                newLine.WireHandlers(() => Recalculate());
+                Lines.Add(newLine);
+            }
         }
 
         Recalculate();
@@ -247,6 +300,14 @@ public partial class ReceiveViewModel
         HasScan = false;
         ScanStatus = "";
     }
+}
+
+public enum PriceSource
+{
+    None,
+    Ocr,
+    Reference,
+    Manual
 }
 
 /// <summary>
@@ -295,6 +356,25 @@ public partial class ScannedRow : ObservableObject
 
     [ObservableProperty] private decimal _unitPrice;
 
+    [ObservableProperty] private PriceSource _priceSource = PriceSource.None;
+
+    [ObservableProperty] private bool _updateProductPurchasePrice;
+
+    public decimal ReferencePurchasePrice => Unit?.PurchasePrice ?? 0m;
+
+    public bool HasPriceDiscrepancy => ReferencePurchasePrice > 0m && UnitPrice > 0m && UnitPrice != ReferencePurchasePrice;
+
+    public string PriceComparisonText => HasPriceDiscrepancy
+        ? $"السعر الحالي في النظام: {ReferencePurchasePrice:N2} ج.م"
+        : (ReferencePurchasePrice > 0m ? $"السعر المرجعي: {ReferencePurchasePrice:N2} ج.م" : string.Empty);
+
+    public int? ManualOverrideProductId { get; private set; }
+    public int? ManualOverrideUnitId { get; private set; }
+    public decimal? ManualOverridePrice { get; private set; }
+
+    private bool _suppressManualPriceTracking;
+    private bool _suppressUnitChangePriceUpdate;
+
     /// <summary>
     /// A price of zero means OCR did not read one, not that the goods were free: adding such a
     /// line left the receipt total at zero, which silently blocked saving. A purchase invoice
@@ -309,6 +389,30 @@ public partial class ScannedRow : ObservableObject
     /// </summary>
     public bool NeedsPrice => UnitPrice <= 0m;
 
+    public void SetPriceInternal(decimal price, PriceSource source)
+    {
+        _suppressManualPriceTracking = true;
+        try
+        {
+            UnitPrice = price;
+            PriceSource = source;
+        }
+        finally
+        {
+            _suppressManualPriceTracking = false;
+        }
+        NotifyPriceProperties();
+    }
+
+    private void NotifyPriceProperties()
+    {
+        OnPropertyChanged(nameof(ReferencePurchasePrice));
+        OnPropertyChanged(nameof(HasPriceDiscrepancy));
+        OnPropertyChanged(nameof(PriceComparisonText));
+        OnPropertyChanged(nameof(IsReady));
+        OnPropertyChanged(nameof(NeedsPrice));
+    }
+
     /// <summary>
     /// Choosing a product chooses its purchase unit. Without this the row could never become ready:
     /// a unit was required to add the line but nothing on screen could set one, so every scan row
@@ -319,23 +423,86 @@ public partial class ScannedRow : ObservableObject
         AvailableUnits.Clear();
 
         if (value is not null && UnitsByProduct.TryGetValue(value.Id, out var forProduct))
+        {
             foreach (var unit in forProduct)
                 AvailableUnits.Add(unit);
+        }
 
-        Unit = AvailableUnits.FirstOrDefault(u => u.IsDefaultPurchase) ?? AvailableUnits.FirstOrDefault();
+        var nextUnit = AvailableUnits.FirstOrDefault(u => u.IsDefaultPurchase) ?? AvailableUnits.FirstOrDefault();
 
-        OnPropertyChanged(nameof(IsReady));
+        _suppressUnitChangePriceUpdate = true;
+        try
+        {
+            Unit = nextUnit;
+        }
+        finally
+        {
+            _suppressUnitChangePriceUpdate = false;
+        }
+
+        ApplyResolvedPriceForSelection(value, nextUnit);
+        NotifyPriceProperties();
     }
 
     partial void OnUnitChanged(UnitRow? value)
-        => OnPropertyChanged(nameof(IsReady));
+    {
+        if (_suppressUnitChangePriceUpdate)
+            return;
+
+        if (value is not null && Product is not null && value.ProductId != 0 && value.ProductId != Product.Id)
+        {
+            Unit = null;
+            return;
+        }
+
+        ApplyResolvedPriceForSelection(Product, value);
+        NotifyPriceProperties();
+    }
+
+    private void ApplyResolvedPriceForSelection(ProductRow? product, UnitRow? unit)
+    {
+        if (product is null || unit is null)
+        {
+            SetPriceInternal(0m, PriceSource.None);
+            return;
+        }
+
+        // If there is an active manual override explicitly for this product and unit, retain it.
+        if (ManualOverrideProductId == product.Id &&
+            ManualOverrideUnitId == unit.Id &&
+            ManualOverridePrice.HasValue)
+        {
+            SetPriceInternal(ManualOverridePrice.Value, PriceSource.Manual);
+            return;
+        }
+
+        // Otherwise do not leak manual price from other products/units. Refresh to reference price.
+        if (unit.PurchasePrice > 0m)
+        {
+            SetPriceInternal(unit.PurchasePrice, PriceSource.Reference);
+        }
+        else if (ScannedUnitPrice.HasValue && ScannedUnitPrice.Value > 0m)
+        {
+            SetPriceInternal(ScannedUnitPrice.Value, PriceSource.Ocr);
+        }
+        else
+        {
+            SetPriceInternal(0m, PriceSource.None);
+        }
+    }
 
     partial void OnQuantityChanged(decimal value)
         => OnPropertyChanged(nameof(IsReady));
 
     partial void OnUnitPriceChanged(decimal value)
     {
-        OnPropertyChanged(nameof(IsReady));
-        OnPropertyChanged(nameof(NeedsPrice));
+        if (!_suppressManualPriceTracking)
+        {
+            PriceSource = PriceSource.Manual;
+            ManualOverrideProductId = Product?.Id;
+            ManualOverrideUnitId = Unit?.Id;
+            ManualOverridePrice = value;
+        }
+        NotifyPriceProperties();
     }
 }

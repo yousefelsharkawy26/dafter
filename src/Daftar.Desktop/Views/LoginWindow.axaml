@@ -3,55 +3,283 @@
         xmlns:vm="using:Daftar.ViewModels"
         x:Class="Daftar.Views.LoginWindow"
         x:DataType="vm:LoginViewModel"
-        Title="تسجيل الدخول"
-        Width="460" SizeToContent="Height"
+        Title="دفتر — تسجيل الدخول"
+        Width="880" Height="530"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
         FlowDirection="RightToLeft"
-        Background="#0078D7">
+        Background="#0A1E34">
 
-    <Border Margin="24" Background="#FFFFFF" CornerRadius="0" Padding="32"
-            BorderBrush="#005A9E" BorderThickness="1">
-        <StackPanel Spacing="16">
+    <Grid ColumnDefinitions="380, *">
 
-            <StackPanel Spacing="4" Margin="0,0,0,12">
-                <TextBlock Text="daftar" FontSize="32" FontWeight="Bold"
-                           Foreground="#0078D7" HorizontalAlignment="Center" />
-                <TextBlock Classes="muted" Text="نظام إدارة المخزون والمبيعات"
-                           HorizontalAlignment="Center" FontSize="13" />
-            </StackPanel>
+        <!-- ========================================================
+             1. الجانب الأيمن: لوحة الهوية والعلامة التجارية (Brand Hero)
+             ======================================================== -->
+        <Border Grid.Column="0">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Color="#091A2D" Offset="0" />
+                    <GradientStop Color="#004578" Offset="0.6" />
+                    <GradientStop Color="#0078D7" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
 
-            <!-- sign in -->
-            <StackPanel IsVisible="{Binding !MustChangePassword}" Spacing="12">
-                <TextBlock Text="اسم المستخدم" FontWeight="SemiBold" />
-                <TextBox Text="{Binding Username}" PlaceholderText="admin" />
+            <Grid RowDefinitions="Auto,*,Auto" Margin="36,32">
 
-                <TextBlock Text="كلمة المرور" FontWeight="SemiBold" />
-                <TextBox Text="{Binding Password}" PasswordChar="●" PlaceholderText="••••" />
+                <!-- Logo & Brand Name -->
+                <StackPanel Grid.Row="0" Spacing="10">
+                    <Border Width="56" Height="56" Background="#00A4EF" CornerRadius="4" HorizontalAlignment="Left">
+                        <!-- Windows/Metro App Quad Tile Logo -->
+                        <Path Width="28" Height="28" Stretch="Uniform" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Data="M0,3.44 L9.8,2.11 L9.8,11.38 L0,11.38 Z M11.16,1.93 L24,0.18 L24,11.38 L11.16,11.38 Z M0,12.62 L9.8,12.62 L9.8,21.89 L0,20.56 Z M11.16,12.62 L24,12.62 L24,23.82 L11.16,22.07 Z" />
+                    </Border>
 
-                <TextBlock Text="{Binding Message}" Foreground="#E51400" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="daftar" FontSize="32" FontWeight="Bold" Foreground="White" />
+                        <TextBlock Text="دَفْتَر" FontSize="26" FontWeight="SemiBold" Foreground="#85CAFF" VerticalAlignment="Center" />
+                    </StackPanel>
 
-                <Button Classes="primary" Content="دخول"
-                        Command="{Binding SignInCommand}" IsEnabled="{Binding !Busy}"
-                        HorizontalAlignment="Stretch" Margin="0,8,0,0" />
-            </StackPanel>
+                    <TextBlock Text="المنظومة المتكاملة لإدارة المبيعات والمخزون والحسابات"
+                               FontSize="13" Foreground="#D2E8FF" TextWrapping="Wrap" LineHeight="20" />
+                </StackPanel>
 
-            <!-- forced password change -->
-            <StackPanel IsVisible="{Binding MustChangePassword}" Spacing="12">
-                <TextBlock Text="غيّر كلمة المرور" FontSize="18" FontWeight="Bold" Foreground="#0078D7" />
-                <TextBlock Text="{Binding Message}" Foreground="#D24726" TextWrapping="Wrap" />
+                <!-- Value Highlights (مميزات النظام) -->
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="16" Margin="0,18,0,0">
+                    <Border Background="#122A42" Padding="14,10" CornerRadius="2" BorderBrush="#1C456D" BorderThickness="1">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Grid.Column="0" Text="🛒" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock Text="نقاط بيع فورية" FontSize="13" FontWeight="Bold" Foreground="White" />
+                                <TextBlock Text="إصدار فواتير نقدية وآجلة مع دعم الباركود" FontSize="11" Foreground="#B0D6FF" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
 
-                <TextBlock Text="كلمة المرور الجديدة" FontWeight="SemiBold" />
-                <TextBox Text="{Binding NewPassword}" PasswordChar="●" />
+                    <Border Background="#122A42" Padding="14,10" CornerRadius="2" BorderBrush="#1C456D" BorderThickness="1">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Grid.Column="0" Text="📦" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock Text="مخزون ذكي وتتبع لوتات" FontSize="13" FontWeight="Bold" Foreground="White" />
+                                <TextBlock Text="تكلفة وارد دقيقة بنظام FIFO التلقائي" FontSize="11" Foreground="#B0D6FF" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
 
-                <TextBlock Text="تأكيد كلمة المرور" FontWeight="SemiBold" />
-                <TextBox Text="{Binding ConfirmPassword}" PasswordChar="●" />
+                    <Border Background="#122A42" Padding="14,10" CornerRadius="2" BorderBrush="#1C456D" BorderThickness="1">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Grid.Column="0" Text="🛡️" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock Text="أمان وصلاحيات مشفرة" FontSize="13" FontWeight="Bold" Foreground="White" />
+                                <TextBlock Text="أدوار متعددة مع سجل تدقيق تفصيلي" FontSize="11" Foreground="#B0D6FF" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </StackPanel>
 
-                <Button Classes="primary" Content="حفظ ومتابعة"
-                        Command="{Binding ChangePasswordCommand}" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
-                <Button Classes="ghost" Content="رجوع"
-                        Command="{Binding BackCommand}" HorizontalAlignment="Stretch" />
-            </StackPanel>
-        </StackPanel>
-    </Border>
+                <!-- Footer Status -->
+                <StackPanel Grid.Row="2" Spacing="4">
+                    <Border Height="1" Background="#1D4368" Margin="0,0,0,8" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="قاعدة البيانات: متصلة محلياً (SQLite)" FontSize="11" Foreground="#85CAFF" />
+                        <TextBlock Grid.Column="1" Text="الإصدار 1.0.0" FontSize="11" Foreground="#85CAFF" FontWeight="SemiBold" />
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ========================================================
+             2. الجانب الأيسر: بطاقة تسجيل الدخول والتفاعل (Interactive Form)
+             ======================================================== -->
+        <Border Grid.Column="1" Background="#FFFFFF" Padding="48,36">
+            <Grid>
+
+                <!-- نموذج الدخول العادي (Standard Sign In) -->
+                <StackPanel IsVisible="{Binding !MustChangePassword}" Spacing="16" VerticalAlignment="Center">
+
+                    <!-- Title Header -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="مرحباً بك مجدداً 👋" FontSize="26" FontWeight="Bold" Foreground="#1F1F1F" />
+                        <TextBlock Text="سجّل الدخول إلى حسابك للوصول إلى لوحة العمل" FontSize="13" Foreground="#666666" />
+                    </StackPanel>
+
+                    <!-- Error Alert Banner -->
+                    <Border IsVisible="{Binding HasMessage}"
+                            Background="#FDE8E8" BorderBrush="#F8B4B4" BorderThickness="1"
+                            Padding="12,10" Margin="0,2,0,4">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Grid.Column="0" Text="⚠️" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Message}" Foreground="#9B1C1C"
+                                       FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Username Field -->
+                    <StackPanel Spacing="6">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="اسم المستخدم" FontSize="13" FontWeight="SemiBold" Foreground="#2A2A2A" />
+                            <TextBlock Grid.Column="1" Text="👤" FontSize="12" Foreground="#888888" />
+                        </Grid>
+                        <AutoCompleteBox x:Name="UsernameBox"
+                                         Text="{Binding Username}"
+                                         ItemsSource="{Binding AvailableUsers}"
+                                         FilterMode="ContainsOrdinal"
+                                         PlaceholderText="أدخل اسم المستخدم (مثال: admin)"
+                                         MinHeight="38" FontSize="14" />
+                    </StackPanel>
+
+                    <!-- Password Field with Show/Hide Eye Toggle -->
+                    <StackPanel Spacing="6">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="كلمة المرور" FontSize="13" FontWeight="SemiBold" Foreground="#2A2A2A" />
+                            <TextBlock Grid.Column="1" Text="🔒" FontSize="12" Foreground="#888888" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Grid.Column="0" x:Name="PasswordBox"
+                                     Text="{Binding Password}"
+                                     PasswordChar="{Binding PasswordChar}"
+                                     PlaceholderText="••••••••"
+                                     MinHeight="38" FontSize="14" />
+
+                            <Button Grid.Column="1" Classes="ghost"
+                                    Command="{Binding TogglePasswordVisibilityCommand}"
+                                    Width="40" Height="38" Margin="4,0,0,0" Padding="0"
+                                    ToolTip.Tip="إظهار / إخفاء كلمة المرور">
+                                <TextBlock Text="{Binding RevealPassword, Converter={x:Null}, FallbackValue='👁️'}"
+                                           FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Actions & Submit Button -->
+                    <StackPanel Spacing="12" Margin="0,8,0,0">
+                        <Button Classes="primary"
+                                Command="{Binding SignInCommand}"
+                                IsEnabled="{Binding !Busy}"
+                                IsDefault="True"
+                                Height="42" HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                                <TextBlock Text="دخول إلى النظام" FontSize="14" FontWeight="Bold" Foreground="White" />
+                                <TextBlock Text="←" FontSize="16" FontWeight="Bold" Foreground="White" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Busy Indicator Text -->
+                        <TextBlock Text="جاري التحقق من بيانات الحساب…"
+                                   IsVisible="{Binding Busy}"
+                                   Foreground="#0078D7" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" />
+
+                        <!-- Default credentials hint -->
+                        <Border Background="#F7F9FA" BorderBrush="#E5E8EB" BorderThickness="1" Padding="10,6" Margin="0,4,0,0">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <TextBlock Grid.Column="0" Text="💡" Margin="0,0,6,0" FontSize="12" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="الحساب الافتراضي للمرة الأولى: admin | كلمة المرور: admin"
+                                           FontSize="11" Foreground="#555555" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                </StackPanel>
+
+                <!-- ========================================================
+                     نموذج تغيير كلمة المرور الإجباري (Must Change Password)
+                     ======================================================== -->
+                <StackPanel IsVisible="{Binding MustChangePassword}" Spacing="16" VerticalAlignment="Center">
+
+                    <!-- Title Header -->
+                    <StackPanel Spacing="4">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="🔐" FontSize="22" VerticalAlignment="Center" />
+                            <TextBlock Text="تعيين كلمة مرور جديدة" FontSize="24" FontWeight="Bold" Foreground="#0078D7" />
+                        </StackPanel>
+                        <TextBlock Text="يتطلب النظام تعيين كلمة مرور قوية وخاصة بك لمتابعة الدخول بأمان"
+                                   FontSize="12" Foreground="#666666" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <!-- Error Alert Banner -->
+                    <Border IsVisible="{Binding HasMessage}"
+                            Background="#FFF8E1" BorderBrush="#FFE082" BorderThickness="1"
+                            Padding="12,10" Margin="0,2,0,2">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Grid.Column="0" Text="ℹ️" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Message}" Foreground="#795548"
+                                       FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- New Password Field -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="كلمة المرور الجديدة" FontSize="13" FontWeight="SemiBold" Foreground="#2A2A2A" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding NewPassword}"
+                                     PasswordChar="{Binding NewPasswordChar}"
+                                     PlaceholderText="أدخل ٦ أحرف على الأقل"
+                                     MinHeight="38" FontSize="14" />
+                            <Button Grid.Column="1" Classes="ghost"
+                                    Command="{Binding ToggleNewPasswordVisibilityCommand}"
+                                    Width="40" Height="38" Margin="4,0,0,0" Padding="0">
+                                <TextBlock Text="👁️" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Confirm Password Field -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="تأكيد كلمة المرور الجديدة" FontSize="13" FontWeight="SemiBold" Foreground="#2A2A2A" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding ConfirmPassword}"
+                                     PasswordChar="{Binding ConfirmPasswordChar}"
+                                     PlaceholderText="أعد كتابة كلمة المرور للتأكيد"
+                                     MinHeight="38" FontSize="14" />
+                            <Button Grid.Column="1" Classes="ghost"
+                                    Command="{Binding ToggleConfirmPasswordVisibilityCommand}"
+                                    Width="40" Height="38" Margin="4,0,0,0" Padding="0">
+                                <TextBlock Text="👁️" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Validation Status Checks -->
+                    <StackPanel Spacing="6" Margin="0,2,0,4">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{Binding HasValidNewPasswordLength, Converter={x:Null}, FallbackValue='○'}"
+                                       Foreground="{Binding HasValidNewPasswordLength, Converter={x:Null}, FallbackValue='#888888'}"
+                                       FontWeight="Bold" />
+                            <TextBlock Text="كلمة المرور ٦ أحرف أو أكثر" FontSize="12"
+                                       Foreground="{Binding HasValidNewPasswordLength, Converter={x:Null}, FallbackValue='#555555'}" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{Binding PasswordsMatch, Converter={x:Null}, FallbackValue='○'}"
+                                       Foreground="{Binding PasswordsMatch, Converter={x:Null}, FallbackValue='#888888'}"
+                                       FontWeight="Bold" />
+                            <TextBlock Text="كلمتا المرور متطابقتان" FontSize="12"
+                                       Foreground="{Binding PasswordsMatch, Converter={x:Null}, FallbackValue='#555555'}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Buttons -->
+                    <StackPanel Spacing="10" Margin="0,6,0,0">
+                        <Button Classes="primary"
+                                Command="{Binding ChangePasswordCommand}"
+                                IsEnabled="{Binding !Busy}"
+                                IsDefault="True"
+                                Height="40" HorizontalAlignment="Stretch">
+                            <TextBlock Text="حفظ كلمة المرور ومتابعة الدخول" FontSize="13" FontWeight="Bold" Foreground="White" />
+                        </Button>
+
+                        <Button Classes="ghost"
+                                Command="{Binding BackCommand}"
+                                IsCancel="True"
+                                Height="36" HorizontalAlignment="Stretch" Content="إلغاء والعودة لتسجيل الدخول" />
+                    </StackPanel>
+
+                </StackPanel>
+
+            </Grid>
+        </Border>
+
+    </Grid>
 </Window>

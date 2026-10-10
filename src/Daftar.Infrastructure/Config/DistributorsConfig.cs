@@ -12,7 +12,7 @@ public sealed class DistributorConfig : IEntityTypeConfiguration<Distributor>
         {
             t.HasCheckConstraint(
                 "CK_Distributors_CommissionBasis", "\"CommissionBasis\" IN ('Sales','Collections')");
-            t.HasCheckConstraint("CK_Distributors_CommissionRate", "\"CommissionRate\" >= 0 AND \"CommissionRate\" <= 100");
+            t.HasCheckConstraint("CK_Distributors_CommissionRate", "CAST(\"CommissionRate\" AS REAL) >= 0 AND CAST(\"CommissionRate\" AS REAL) <= 100");
         });
 
         b.HasKey(d => d.Id);

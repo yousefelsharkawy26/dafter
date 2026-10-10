@@ -22,5 +22,11 @@ public static class DaftarDatabase
 
         await context.Database.MigrateAsync(ct);
         await Seed.SeedAsync(context, adminPasswordHash, ct);
+
+        var report = await new Services.IntegrityChecker(context).RunAllAsync(ct);
+        if (!report.IsClean)
+        {
+            Console.WriteLine($"[INTEGRITY ALERT] {report}");
+        }
     }
 }

@@ -42,6 +42,7 @@ public sealed class ProductUnitConfig : IEntityTypeConfiguration<ProductUnit>
         b.Property(u => u.Id).ValueGeneratedOnAdd();
         b.Property(u => u.Name).IsRequired();
         b.Property(u => u.Factor).HasPrecision(18, 6).IsRequired();
+        b.Property(u => u.PurchasePrice).HasPrecision(18, 2).HasDefaultValue(0m);
         b.Property(u => u.IsDefaultSale).HasDefaultValue(false);
         b.Property(u => u.IsDefaultPurchase).HasDefaultValue(false);
         b.Property(u => u.IsActive).HasDefaultValue(true);

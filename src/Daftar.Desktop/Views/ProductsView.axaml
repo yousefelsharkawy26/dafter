@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -8,112 +9,581 @@
              x:DataType="vm:ProductsViewModel"
              FlowDirection="RightToLeft">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled">
-    <Grid ColumnDefinitions="300,*" Margin="16">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="{StaticResource PagePadding}">
 
-        <!-- products list + add form -->
-        <Border Grid.Column="0" Classes="card" Margin="0,0,16,0">
-            <StackPanel Spacing="10">
+        <!-- ========================================================
+             1. Header Bar: KPIs + Quick Add
+             ======================================================== -->
+        <Border Grid.Row="0" Classes="panel" Margin="0,0,0,12" Padding="14,10">
+            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
 
-                    <TextBlock Classes="heading" Text="الأصناف" />
-
-                    <ListBox ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct}"
-                             MaxHeight="220">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ProductRow">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                    <TextBlock Classes="muted" Text="{Binding Sku}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-
-                    <TextBlock Classes="heading" Text="صنف جديد" Margin="0,10,0,0" />
-
-                    <TextBlock Classes="muted" Text="الكود (SKU)" />
-                    <TextBox Text="{Binding NewSku}" PlaceholderText="OLIVE-1" />
-
-                    <TextBlock Classes="muted" Text="الاسم" />
-                    <TextBox Text="{Binding NewName}" PlaceholderText="زيت زيتون" />
-
-                    <TextBlock Classes="muted" Text="وحدة الأساس" />
-                    <TextBox Text="{Binding NewBaseUnit}" PlaceholderText="piece / kg / لتر" />
-
-                    <TextBlock Classes="muted" Text="حد إعادة الطلب" />
-                    <TextBox Text="{Binding NewReorderLevel}" PlaceholderText="اختياري" />
-
-                    <Button Classes="primary" Content="إضافة الصنف"
-                            Command="{Binding AddProductCommand}" HorizontalAlignment="Stretch" />
-                </StackPanel>
-        </Border>
-
-        <!-- units and prices for the selected product -->
-        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto" RowSpacing="16">
-
-            <Border Grid.Row="0" Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Classes="heading" Text="وحدات الصنف" />
-                    <DataGrid ItemsSource="{Binding Units}" MaxHeight="180">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="الوحدة" Binding="{Binding Name}" Width="*" />
-                            <DataGridTextColumn Header="معامل التحويل" Binding="{Binding Factor}" Width="120" />
-                            <DataGridTextColumn Header="أساس" Binding="{Binding IsBase}" Width="70" />
-                            <DataGridTextColumn Header="بيع افتراضي" Binding="{Binding IsDefaultSale}" Width="100" />
-                            <DataGridTextColumn Header="شراء افتراضي" Binding="{Binding IsDefaultPurchase}" Width="100" />
-                            <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="140" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <Grid ColumnDefinitions="*,100,Auto,Auto" ColumnSpacing="8">
-                        <TextBox Grid.Column="0" Text="{Binding UnitName}" PlaceholderText="اسم الوحدة (كرتون مثلاً)" />
-                        <TextBox Grid.Column="1" Text="{Binding UnitFactor}" PlaceholderText="الوحدات في الأساس" />
-                        <CheckBox Grid.Column="2" Content="أساس" IsChecked="{Binding UnitIsBase}" />
-                        <CheckBox Grid.Column="3" Content="بيع افتراضي" IsChecked="{Binding UnitDefaultSale}" />
-                    </Grid>
-                    <Button Content="إضافة الوحدة" Command="{Binding AddUnitCommand}"
-                            HorizontalAlignment="Left" />
-                </StackPanel>
-            </Border>
-
-            <Border Grid.Row="1" Classes="card">
-                <StackPanel Spacing="10">
-                    <TextBlock Classes="heading" Text="الأسعار" />
-                    <DataGrid ItemsSource="{Binding Prices}" MaxHeight="150">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="الوحدة" Binding="{Binding UnitName}" Width="*" />
-                            <DataGridTextColumn Header="السعر" Binding="{Binding Price}" Width="120" />
-                            <DataGridTextColumn Header="ساري من"
-                                                Binding="{Binding EffectiveFrom, StringFormat='yyyy-MM-dd'}"
-                                                Width="130" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ComboBox ItemsSource="{Binding Units}" SelectedItem="{Binding PriceUnit}"
-                                  PlaceholderText="الوحدة" MinWidth="160">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:UnitRow">
-                                    <TextBlock Text="{Binding Name}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <TextBox Text="{Binding PriceAmount}" PlaceholderText="السعر" Width="120" />
-                        <Button Content="حفظ السعر" Command="{Binding AddPriceCommand}" />
+                <!-- Title & KPI summary badges -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="دليل الأصناف والأسعار" Classes="subtitle" FontWeight="Bold" />
+                        <TextBlock Text="إدارة الكتالوج، الوحدات المتعددة، وتحديد أسعار البيع والشراء" Classes="caption" />
                     </StackPanel>
 
-                    <TextBlock Classes="muted"
-                               Text="السعر بيتسجل كسطر جديد — القديم ما يتغيرش عشان الفواتير القديمة تفضل صح" />
+                    <Rectangle Width="1" Height="28" Fill="{DynamicResource ControlStrokeColorDefaultBrush}" Margin="8,0" />
+
+                    <!-- KPIs -->
+                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <Border Classes="surface" Padding="10,4">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="إجمالي الأصناف:" Classes="caption" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding TotalProductsCount}" Classes="strong" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="surface" Padding="10,4">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="النشطة:" Classes="caption" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding ActiveProductsCount}" Classes="strong success" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="badge warning" Padding="10,4" IsVisible="{Binding LowStockProductsCount}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="⚠️ نقص بالمخزون:" Classes="caption" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding LowStockProductsCount}" Classes="strong danger" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="surface" Padding="10,4">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="إجمالي الوحدات:" Classes="caption" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding TotalUnitsCount}" Classes="strong" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
+
+                <!-- Actions: Refresh & New Product -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Classes="ghost" Command="{Binding RefreshCommand}" ToolTip.Tip="تحديث البيانات">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="🔄" FontSize="14" VerticalAlignment="Center" />
+                            <TextBlock Text="تحديث" Classes="caption" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Classes="accent" Command="{Binding StartAddProductCommand}" Padding="16,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="+" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                            <TextBlock Text="صنف جديد" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ========================================================
+             2. Main Content Split: Products List vs Details/Forms
+             ======================================================== -->
+        <Grid Grid.Row="1" ColumnDefinitions="360,*" ColumnSpacing="12">
+
+            <!-- ───────── Left Column: Product Search & List ───────── -->
+            <Border Grid.Column="0" Classes="panel">
+                <Grid RowDefinitions="Auto,Auto,*" Margin="10">
+
+                    <!-- Search Input -->
+                    <TextBox Grid.Row="0"
+                             Text="{Binding SearchText, Mode=TwoWay}"
+                             PlaceholderText="ابحث بالاسم، الكود SKU، أو الباركود..."
+                             Height="38"
+                             VerticalContentAlignment="Center"
+                             Margin="0,0,0,8">
+                        <TextBox.InnerLeftContent>
+                            <PathIcon Data="{StaticResource IconSearch}"
+                                      Width="15" Height="15"
+                                      Margin="10,0"
+                                      Opacity="0.6" />
+                        </TextBox.InnerLeftContent>
+                    </TextBox>
+
+                    <!-- Filter Chips -->
+                    <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="4" Margin="0,0,0,8">
+                        <Button Grid.Column="0" Classes="ghost" Content="الكل"
+                                Command="{Binding SetFilterCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                            <Button.CommandParameter><x:Int32>0</x:Int32></Button.CommandParameter>
+                        </Button>
+                        <Button Grid.Column="1" Classes="ghost" Content="النشطة"
+                                Command="{Binding SetFilterCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                            <Button.CommandParameter><x:Int32>1</x:Int32></Button.CommandParameter>
+                        </Button>
+                        <Button Grid.Column="2" Classes="ghost" Content="النواقص"
+                                Command="{Binding SetFilterCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                            <Button.CommandParameter><x:Int32>2</x:Int32></Button.CommandParameter>
+                        </Button>
+                        <Button Grid.Column="3" Classes="ghost" Content="المعطلة"
+                                Command="{Binding SetFilterCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                            <Button.CommandParameter><x:Int32>3</x:Int32></Button.CommandParameter>
+                        </Button>
+                    </Grid>
+
+                    <!-- Products List -->
+                    <Grid Grid.Row="2">
+                        <ListBox ItemsSource="{Binding FilteredProducts}"
+                                 SelectedItem="{Binding SelectedProduct, Mode=TwoWay}"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProductRow">
+                                    <Border Padding="8,6" Margin="0,1">
+                                        <Grid RowDefinitions="Auto,Auto" RowSpacing="4">
+
+                                            <!-- Row 0: Name & Stock Badge -->
+                                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding Name}"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="14"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           VerticalAlignment="Center" />
+
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                    <!-- Low Stock Badge -->
+                                                    <Border Classes="badge danger" IsVisible="{Binding IsLowStock}">
+                                                        <TextBlock Text="نقص مخزون" />
+                                                    </Border>
+                                                    <!-- Stock Level -->
+                                                    <Border Classes="surface" Padding="6,2" IsVisible="{Binding !IsLowStock}">
+                                                        <TextBlock Text="{Binding OnHandText}" Classes="caption" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- Row 1: SKU, Units Count, Status -->
+                                            <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                                                <Border Classes="surface" Padding="4,1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Sku}" Classes="caption" FontWeight="SemiBold" />
+                                                </Border>
+
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding UnitsCount, StringFormat='{}{0} وحدة'}"
+                                                           Classes="caption muted"
+                                                           VerticalAlignment="Center" />
+
+                                                <Border Grid.Column="2"
+                                                        Classes="badge success"
+                                                        IsVisible="{Binding IsActive}"
+                                                        VerticalAlignment="Center">
+                                                    <TextBlock Text="نشط" />
+                                                </Border>
+                                                <Border Grid.Column="2"
+                                                        Classes="badge warning"
+                                                        IsVisible="{Binding !IsActive}"
+                                                        VerticalAlignment="Center">
+                                                    <TextBlock Text="معطل" />
+                                                </Border>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <!-- Empty Search Notification -->
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                                    Spacing="8"
+                                    IsVisible="{Binding !FilteredProducts.Count}">
+                            <TextBlock Text="🔍" FontSize="32" HorizontalAlignment="Center" Opacity="0.5" />
+                            <TextBlock Text="لا توجد أصناف مطابقة" Classes="subtitle" HorizontalAlignment="Center" />
+                            <TextBlock Text="جرب البحث بكلمة أخرى أو أضف صنفاً جديداً" Classes="caption muted" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
             </Border>
 
-            <Border Grid.Row="2" Classes="card">
-                <StackPanel Spacing="6">
-                    <TextBlock Classes="muted" Text="{Binding Status}" TextWrapping="Wrap" />
+            <!-- ───────── Right Column: Details, Editing or New Product ───────── -->
+            <Grid Grid.Column="1" RowDefinitions="*">
+
+                <!-- VIEW A: New Product Form -->
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" IsVisible="{Binding IsAddingNewProduct}">
+                    <Border Classes="panel" Padding="20">
+                        <StackPanel Spacing="16">
+
+                            <!-- Header -->
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="إضافة صنف جديد للكتالوج" Classes="heading" />
+                                    <TextBlock Text="قم بتعريف بيانات الصنف ووحدة القياس الأساسية وأسعار التكلفة والبيع المبدئية" Classes="caption muted" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="ghost" Content="✕ إلغاء" Command="{Binding CancelAddProductCommand}" />
+                            </Grid>
+
+                            <!-- Section 1: Basic Information -->
+                            <Border Classes="surface" Padding="14">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="1. البيانات الأساسية للصنف" FontWeight="Bold" />
+
+                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                                        <StackPanel Grid.Column="0" Spacing="4">
+                                            <TextBlock Text="اسم الصنف *" Classes="caption" />
+                                            <TextBox Text="{Binding NewName, Mode=TwoWay}" PlaceholderText="مثال: زيت زيتون 1 لتر" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="4">
+                                            <TextBlock Text="الكود (SKU) - تلقائي من الاسم" Classes="caption" />
+                                            <TextBox Text="{Binding NewSku, Mode=TwoWay}" PlaceholderText="تلقائي (مثل: زيت-1) أو أدخل كود مخصص" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="4">
+                                            <TextBlock Text="حد إعادة الطلب (اختياري)" Classes="caption" />
+                                            <TextBox Text="{Binding NewReorderLevel, Mode=TwoWay}" PlaceholderText="مثال: 10" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Section 2: Base Unit & Quick Pricing -->
+                            <Border Classes="surface" Padding="14">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="2. وحدة القياس الأساسية والتسعير المبدئي" FontWeight="Bold" />
+
+                                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                                        <StackPanel Grid.Column="0" Spacing="4">
+                                            <TextBlock Text="اسم وحدة الأساس *" Classes="caption" />
+                                            <TextBox Text="{Binding NewBaseUnit, Mode=TwoWay}" PlaceholderText="مثال: قطعة / لتر / كجم" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="4">
+                                            <TextBlock Text="سعر الشراء المبدئي" Classes="caption" />
+                                            <TextBox Text="{Binding NewPurchasePrice, Mode=TwoWay}" PlaceholderText="0.00 ج.م" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="4">
+                                            <TextBlock Text="سعر البيع المبدئي" Classes="caption" />
+                                            <TextBox Text="{Binding NewSalePrice, Mode=TwoWay}" PlaceholderText="0.00 ج.م" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3" Spacing="4">
+                                            <TextBlock Text="الباركود (اختياري)" Classes="caption" />
+                                            <TextBox Text="{Binding NewBarcode, Mode=TwoWay}" PlaceholderText="امسح الباركود..." />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Save / Cancel Buttons -->
+                            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,10,0,0">
+                                <Button Classes="ghost" Content="إلغاء" Command="{Binding CancelAddProductCommand}" />
+                                <Button Classes="accent" Command="{Binding AddProductCommand}" Padding="20,8">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <PathIcon Data="{StaticResource IconCheck}" Width="16" Height="16" />
+                                        <TextBlock Text="حفظ وإضافة الصنف" FontWeight="Bold" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+
+                <!-- VIEW B: Selected Product Details & Unit Management -->
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" IsVisible="{Binding ShowProductDetails}">
+                    <StackPanel Spacing="12">
+
+                        <!-- Card 1: Product Master Info & Inline Edit -->
+                        <Border Classes="panel" Padding="16">
+                            <StackPanel Spacing="12">
+
+                                <!-- Title Row -->
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding SelectedProduct.Name}" Classes="heading" Margin="0" VerticalAlignment="Center" />
+                                        <Border Classes="surface" Padding="8,2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding SelectedProduct.Sku, StringFormat='SKU: {0}'}" FontWeight="SemiBold" Classes="caption" />
+                                        </Border>
+                                        <Border Classes="badge danger" IsVisible="{Binding IsCurrentLowStock}" VerticalAlignment="Center">
+                                            <TextBlock Text="⚠️ تحت حد الطلب" />
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!-- Stock on Hand Badge -->
+                                    <Border Grid.Column="1" Classes="surface" Padding="10,4" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="رصيد المخزون:" Classes="caption" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding CurrentOnHand, StringFormat='{}{0:G29}'}" FontWeight="Bold" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding CurrentOnHandUnit}" Classes="caption" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Active Toggle -->
+                                    <Button Grid.Column="2" Classes="ghost"
+                                            Command="{Binding ToggleActiveCommand}"
+                                            CommandParameter="{Binding SelectedProduct}"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding EditIsActive, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=True, StringFormat='إيقاف الصنف'}"
+                                                   Classes="caption danger"
+                                                   IsVisible="{Binding EditIsActive}" />
+                                    </Button>
+                                    <Button Grid.Column="2" Classes="ghost"
+                                            Command="{Binding ToggleActiveCommand}"
+                                            CommandParameter="{Binding SelectedProduct}"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="تفعيل الصنف" Classes="caption success" IsVisible="{Binding !EditIsActive}" />
+                                    </Button>
+                                </Grid>
+
+                                <Rectangle Height="1" Fill="{DynamicResource ControlStrokeColorDefaultBrush}" />
+
+                                <!-- Edit Product Fields -->
+                                <Grid ColumnDefinitions="*,*,Auto,Auto" ColumnSpacing="12" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="اسم الصنف" Classes="caption" />
+                                        <TextBox Text="{Binding EditName, Mode=TwoWay}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Text="كود الصنف (SKU)" Classes="caption" />
+                                        <TextBox Text="{Binding EditSku, Mode=TwoWay}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Spacing="4" Width="120">
+                                        <TextBlock Text="حد إعادة الطلب" Classes="caption" />
+                                        <TextBox Text="{Binding EditReorderLevel, Mode=TwoWay}" />
+                                    </StackPanel>
+
+                                    <Button Grid.Column="3" Classes="accent"
+                                            Command="{Binding SaveProductEditCommand}"
+                                            VerticalAlignment="Bottom"
+                                            Padding="14,8"
+                                            ToolTip.Tip="حفظ تعديلات بيانات الصنف">
+                                        <TextBlock Text="حفظ التعديلات" FontWeight="SemiBold" />
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Card 2: Units Table & Smart Unit Management -->
+                        <Border Classes="panel" Padding="16">
+                            <StackPanel Spacing="14">
+
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <TextBlock Text="وحدات القياس والتسعير" Classes="heading" Margin="0" />
+                                        <TextBlock Text="يمكنك تعريف أكثر من وحدة للصنف (كرتونة، قطعة، إلخ) وتحديد معاملات التحويل وأسعار الشراء والبيع" Classes="caption muted" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Units DataGrid -->
+                                <DataGrid ItemsSource="{Binding Units}"
+                                          MaxHeight="220"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          GridLinesVisibility="Horizontal">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="الوحدة" Binding="{Binding Name}" Width="*" />
+                                        <DataGridTextColumn Header="المعامل" Binding="{Binding Factor}" Width="*" />
+                                        
+                                        <!-- Base Unit Column -->
+                                        <DataGridTemplateColumn Header="الأساس" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate x:DataType="vm:UnitRow">
+                                                    <Border Classes="badge success" HorizontalAlignment="Center" IsVisible="{Binding IsBase}">
+                                                        <TextBlock Text="أساس" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+
+                                        <!-- Default Sale Column -->
+                                        <DataGridTemplateColumn Header="افتراضي بيع" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate x:DataType="vm:UnitRow">
+                                                    <Border Classes="badge" Background="#E6F2FF" HorizontalAlignment="Center" IsVisible="{Binding IsDefaultSale}">
+                                                        <TextBlock Text="بيع ⭐" Foreground="#0078D7" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+
+                                        <!-- Default Purchase Column -->
+                                        <DataGridTemplateColumn Header="افتراضي شراء" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate x:DataType="vm:UnitRow">
+                                                    <Border Classes="badge" Background="#EBF7EE" HorizontalAlignment="Center" IsVisible="{Binding IsDefaultPurchase}">
+                                                        <TextBlock Text="شراء 🛒" Foreground="#107C41" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+
+                                        <DataGridTextColumn Header="سعر الشراء" Binding="{Binding PurchasePrice, StringFormat='{}{0:N2} ج.م'}" Width="*" />
+                                        <DataGridTextColumn Header="سعر البيع" Binding="{Binding SalePrice, StringFormat='{}{0:N2} ج.م'}" Width="*" />
+                                        <DataGridTextColumn Header="هامش الربح" Binding="{Binding ProfitMarginText}" Width="*" />
+                                        <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="1.3*" />
+
+                                        <!-- Actions Column -->
+                                        <DataGridTemplateColumn Header="إجراءات" Width="110">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate x:DataType="vm:UnitRow">
+                                                    <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                                                        <!-- Edit Unit Button -->
+                                                        <Button Classes="icon"
+                                                                Command="{Binding $parent[UserControl].((vm:ProductsViewModel)DataContext).EditUnitCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                ToolTip.Tip="تعديل بيانات وسعر الوحدة">
+                                                            <TextBlock Text="✏️" FontSize="12" />
+                                                        </Button>
+
+                                                        <!-- Set Default Sale Button -->
+                                                        <Button Classes="icon"
+                                                                Command="{Binding $parent[UserControl].((vm:ProductsViewModel)DataContext).SetDefaultSaleUnitCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                ToolTip.Tip="تعيين كوحدة بيع افتراضية">
+                                                            <TextBlock Text="⭐" FontSize="12" />
+                                                        </Button>
+
+                                                        <!-- Delete Unit Button -->
+                                                        <Button Classes="icon remove"
+                                                                Command="{Binding $parent[UserControl].((vm:ProductsViewModel)DataContext).DeleteUnitCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                IsVisible="{Binding !IsBase}"
+                                                                ToolTip.Tip="حذف الوحدة">
+                                                            <PathIcon Data="{StaticResource IconTrash}" Width="12" Height="12" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <!-- Unit Edit / Add Form (Surface Box) -->
+                                <Border Classes="surface" Padding="14">
+                                    <StackPanel Spacing="10">
+
+                                        <!-- Form Title & Mode -->
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="✏️ تعديل بيانات الوحدة" FontWeight="Bold" IsVisible="{Binding IsEditingUnit}" />
+                                                <TextBlock Text="➕ إضافة وحدة جديدة للصنف" FontWeight="Bold" IsVisible="{Binding !IsEditingUnit}" />
+                                                <TextBlock Text="{Binding UnitProfitMarginPreview}" Classes="strong success" Margin="10,0" IsVisible="{Binding UnitProfitMarginPreview, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                            </StackPanel>
+
+                                            <Button Grid.Column="1" Classes="ghost" Content="إلغاء التعديل"
+                                                    Command="{Binding CancelEditUnitCommand}"
+                                                    IsVisible="{Binding IsEditingUnit}" />
+                                        </Grid>
+
+                                        <!-- Input Row 1 -->
+                                        <Grid ColumnDefinitions="*,100,*" ColumnSpacing="10">
+                                            <StackPanel Grid.Column="0" Spacing="4">
+                                                <TextBlock Text="اسم الوحدة *" Classes="caption" />
+                                                <TextBox Text="{Binding UnitName, Mode=TwoWay}" PlaceholderText="مثال: كرتونة / باكت" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                <TextBlock Text="المعامل *" Classes="caption" />
+                                                <TextBox Text="{Binding UnitFactor, Mode=TwoWay}" PlaceholderText="عدد القطع" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Spacing="4">
+                                                <TextBlock Text="الباركود (اختياري)" Classes="caption" />
+                                                <TextBox Text="{Binding UnitBarcode, Mode=TwoWay}" PlaceholderText="امسح أو اكتب الباركود" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- Input Row 2: Prices -->
+                                        <Grid ColumnDefinitions="*,*,Auto,Auto,Auto" ColumnSpacing="10" VerticalAlignment="Center">
+                                            <StackPanel Grid.Column="0" Spacing="4">
+                                                <TextBlock Text="سعر الشراء المرجعي" Classes="caption" />
+                                                <TextBox Text="{Binding UnitPurchasePrice, Mode=TwoWay}" PlaceholderText="0.00 ج.م" />
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                <TextBlock Text="سعر البيع" Classes="caption" />
+                                                <TextBox Text="{Binding UnitSalePrice, Mode=TwoWay}" PlaceholderText="0.00 ج.م" />
+                                            </StackPanel>
+
+                                            <!-- Checkbox flags -->
+                                            <CheckBox Grid.Column="2" Content="أساس" IsChecked="{Binding UnitIsBase, Mode=TwoWay}" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+                                            <CheckBox Grid.Column="3" Content="بيع افتراضي" IsChecked="{Binding UnitDefaultSale, Mode=TwoWay}" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+                                            <CheckBox Grid.Column="4" Content="شراء افتراضي" IsChecked="{Binding UnitDefaultPurchase, Mode=TwoWay}" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+                                        </Grid>
+
+                                        <!-- Submit button -->
+                                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                            <Button Classes="accent" Command="{Binding SaveUnitCommand}" Padding="16,6" IsVisible="{Binding IsEditingUnit}">
+                                                <TextBlock Text="حفظ التعديلات"
+                                                           FontWeight="SemiBold" />
+                                            </Button>
+                                            <Button Classes="accent" Command="{Binding SaveUnitCommand}" Padding="16,6" IsVisible="{Binding !IsEditingUnit}">
+                                                <TextBlock Text="إضافة الوحدة" FontWeight="SemiBold" />
+                                            </Button>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Card 3: Price History & Quick Price Entry -->
+                        <Border Classes="panel" Padding="16">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="سجل أسعار البيع والتسعير الجديد" Classes="heading" Margin="0" />
+
+                                <Grid ColumnDefinitions="*,340" ColumnSpacing="16">
+                                    <!-- Price History Table -->
+                                    <DataGrid Grid.Column="0"
+                                              ItemsSource="{Binding Prices}"
+                                              MaxHeight="150"
+                                              AutoGenerateColumns="False"
+                                              IsReadOnly="True">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="الوحدة" Binding="{Binding UnitName}" Width="*" />
+                                            <DataGridTextColumn Header="السعر" Binding="{Binding Price, StringFormat='{}{0:N2} ج.م'}" Width="120" />
+                                            <DataGridTextColumn Header="ساري من" Binding="{Binding EffectiveFrom, StringFormat='yyyy-MM-dd'}" Width="120" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+
+                                    <!-- Quick Record Price -->
+                                    <Border Grid.Column="1" Classes="surface" Padding="12">
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="تسجيل سعر بيع جديد" FontWeight="Bold" Classes="caption" />
+
+                                            <ComboBox ItemsSource="{Binding Units}"
+                                                      SelectedItem="{Binding PriceUnit, Mode=TwoWay}"
+                                                      PlaceholderText="اختر الوحدة"
+                                                      HorizontalAlignment="Stretch">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:UnitRow">
+                                                        <TextBlock Text="{Binding Name}" />
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+
+                                            <TextBox Text="{Binding PriceAmount, Mode=TwoWay}" PlaceholderText="السعر الجديد (ج.م)" />
+
+                                            <Button Classes="primary" Content="حفظ وتطبيق السعر"
+                                                    Command="{Binding AddPriceCommand}"
+                                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+
+                                            <TextBlock Classes="caption muted" TextWrapping="Wrap"
+                                                       Text="تغيير السعر يُسجل كسطر جديد لحفظ سلامة الفواتير السابقة وتكاليفها التاريخية." />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- VIEW C: Empty State (No Product Selected) -->
+                <StackPanel Grid.Row="0"
+                            VerticalAlignment="Center" HorizontalAlignment="Center"
+                            Spacing="10"
+                            IsVisible="{Binding ShowEmptyState}">
+                    <TextBlock Text="📦" FontSize="48" HorizontalAlignment="Center" Opacity="0.4" />
+                    <TextBlock Text="اختر صنفاً من القائمة لعرض تفاصيله" Classes="subtitle" HorizontalAlignment="Center" />
+                    <TextBlock Text="أو اضغط على زر 'صنف جديد' لإضافة صنف جديد إلى الكتالوج" Classes="caption muted" HorizontalAlignment="Center" />
                 </StackPanel>
-            </Border>
+            </Grid>
         </Grid>
+
+        <!-- ========================================================
+             3. Status Notification Bar
+             ======================================================== -->
+        <Border Grid.Row="2" Classes="panel" Margin="0,10,0,0" Padding="12,6">
+            <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Grid.Column="0" Text="الحالة:" FontWeight="SemiBold" Classes="caption" Margin="0,0,8,0" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Status}"
+                           Classes="caption strong"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+            </Grid>
+        </Border>
     </Grid>
-    </ScrollViewer>
 </UserControl>

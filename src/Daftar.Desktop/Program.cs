@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia;
 using Daftar.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,16 @@ sealed class Program
     {
         var services = Bootstrap.BuildServiceProvider();
         Bootstrap.InitializeDatabase(services);
+
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+        {
+            Console.WriteLine($"[FATAL] Unhandled exception: {e.ExceptionObject}");
+        };
+        TaskScheduler.UnobservedTaskException += (s, e) =>
+        {
+            Console.WriteLine($"[ERROR] Unobserved task exception: {e.Exception}");
+            e.SetObserved();
+        };
 
         try
         {

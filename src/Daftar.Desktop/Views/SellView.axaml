@@ -1,162 +1,705 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
              x:Class="Daftar.Views.SellView"
              x:DataType="vm:SellViewModel"
              FlowDirection="RightToLeft">
 
-    <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="16">
+    <UserControl.Styles>
+        <Style Selector="Button.tile">
+            <Setter Property="Background" Value="#F0F6FC" />
+            <Setter Property="BorderBrush" Value="#0078D7" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.tile:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#DDEBF7" />
+            <Setter Property="BorderBrush" Value="#005A9E" />
+        </Style>
+        <Style Selector="Button.tile:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#C5DFF4" />
+            <Setter Property="BorderBrush" Value="#004578" />
+        </Style>
+        <Style Selector="Button.tile:disabled /template/ ContentPresenter">
+            <Setter Property="Background" Value="#F4F4F4" />
+            <Setter Property="BorderBrush" Value="#D6D6D6" />
+            <Setter Property="Opacity" Value="0.6" />
+        </Style>
+        <Style Selector="Button.tile TextBlock.strong">
+            <Setter Property="Foreground" Value="#0A3663" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.tile TextBlock.price">
+            <Setter Property="Foreground" Value="#0078D7" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+    </UserControl.Styles>
 
-        <!-- customer + totals -->
-        <Border Grid.Row="0" Classes="card" Margin="0,0,0,12">
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16">
-                <StackPanel Grid.Column="0" Spacing="6">
-                    <TextBlock Classes="muted" Text="العميل" />
-                    <ComboBox ItemsSource="{Binding Customers}"
-                              SelectedItem="{Binding SelectedCustomer}"
-                              HorizontalAlignment="Stretch"
-                              MinHeight="36">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:PartyOption">
-                                <TextBlock Text="{Binding Display}" />
+    <!--
+        بيع / Sales screen
+        All bindings below match the current SellViewModel, SettlementPanel,
+        ProductOption, PartyOption and CartLine APIs.
+    -->
+
+    <Grid Margin="{StaticResource PagePadding}"
+          ColumnSpacing="{StaticResource SpaceLg}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="{StaticResource CartPanelWidth}" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ========================================================
+             Products: search + tiles
+             ======================================================== -->
+        <Grid Grid.Column="0"
+              RowDefinitions="Auto,*"
+              RowSpacing="{StaticResource SpaceMd}">
+
+            <Grid Grid.Row="0"
+                  ColumnSpacing="{StaticResource SpaceMd}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Name="SearchBox"
+                         Text="{Binding ProductSearchText}"
+                         KeyDown="OnSearchKeyDown"
+                         PlaceholderText="ابحث باسم الصنف أو امسح الباركود"
+                         FontSize="{StaticResource FontSizeSubtitle}"
+                         Height="{StaticResource SearchHeight}"
+                         VerticalContentAlignment="Center">
+                    <TextBox.InnerLeftContent>
+                        <PathIcon Data="{StaticResource IconSearch}"
+                                  Width="16"
+                                  Height="16"
+                                  Margin="12,0"
+                                  Opacity="0.6" />
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+
+                <TextBlock Grid.Column="1"
+                           Classes="caption"
+                           VerticalAlignment="Center"
+                           Text="{Binding FilteredProducts.Count, StringFormat='{}{0} صنف'}" />
+            </Grid>
+
+            <Grid Grid.Row="1">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ui:FAItemsRepeater ItemsSource="{Binding FilteredProducts}"
+                                   Margin="0,0,0,8">
+                        <ui:FAItemsRepeater.Layout>
+                            <ui:FAUniformGridLayout MinItemWidth="{StaticResource TileMinWidth}"
+                                                MinItemHeight="{StaticResource TileHeight}"
+                                                MinRowSpacing="{StaticResource SpaceSm}"
+                                                MinColumnSpacing="{StaticResource SpaceSm}"
+                                                ItemsStretch="Fill" />
+                        </ui:FAItemsRepeater.Layout>
+
+                        <ui:FAItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProductOption">
+                                <Button Classes="tile"
+                                        Command="{Binding $parent[UserControl].((vm:SellViewModel)DataContext).SelectProductCommand}"
+                                        CommandParameter="{Binding}"
+                                        IsEnabled="{Binding HasStock}"
+                                        ToolTip.Tip="{Binding Display}">
+                                    <Grid RowDefinitions="Auto,*,Auto">
+
+                                        <!-- SKU + stock flag -->
+                                        <Grid Grid.Row="0"
+                                              ColumnSpacing="{StaticResource SpaceSm}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Sku}"
+                                                       Classes="caption"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" />
+
+                                            <StackPanel Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        Spacing="{StaticResource SpaceXs}">
+                                                <Border Classes="badge warning"
+                                                        IsVisible="{Binding IsLowStock}">
+                                                    <TextBlock Text="مخزون منخفض" />
+                                                </Border>
+                                                <Border Classes="badge danger"
+                                                        IsVisible="{Binding !HasStock}">
+                                                    <TextBlock Text="نفد المخزون" />
+                                                </Border>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,3">
+                                            <TextBlock Text="{Binding Name}"
+                                                       Classes="strong"
+                                                       TextWrapping="Wrap"
+                                                       MaxLines="2"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <ComboBox ItemsSource="{Binding AvailableUnits}"
+                                                      SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
+                                                      DisplayMemberBinding="{Binding UnitName}"
+                                                      IsVisible="{Binding HasMultipleUnits}"
+                                                      HorizontalAlignment="Center"
+                                                      MinHeight="24" Height="24" FontSize="11"
+                                                      Padding="6,1" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding UnitName, StringFormat='({0})'}"
+                                                       Classes="caption"
+                                                       Foreground="#0078D7"
+                                                       FontWeight="SemiBold"
+                                                       Margin="0,2,0,0"
+                                                       HorizontalAlignment="Center"
+                                                       IsVisible="{Binding !HasMultipleUnits}" />
+                                        </StackPanel>
+
+                                        <!-- price / unit / on hand -->
+                                        <Grid Grid.Row="2"
+                                              ColumnSpacing="{StaticResource SpaceXs}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding PriceText}"
+                                                       Classes="price"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding UnitName, StringFormat='/ {}{0}'}"
+                                                       Classes="caption"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding OnHandText}"
+                                                       Classes="caption"
+                                                       VerticalAlignment="Center"
+                                                       IsVisible="{Binding HasStock}" />
+                                        </Grid>
+                                    </Grid>
+                                </Button>
                             </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </StackPanel>
+                        </ui:FAItemsRepeater.ItemTemplate>
+                    </ui:FAItemsRepeater>
+                </ScrollViewer>
 
-                <StackPanel Grid.Column="1" Spacing="2" MinWidth="130">
-                    <TextBlock Classes="muted" Text="الإجمالي" />
-                    <TextBlock Classes="tile-value" Text="{Binding TotalText}" />
-                </StackPanel>
-
-                <StackPanel Grid.Column="2" Spacing="2" MinWidth="130">
-                    <TextBlock Classes="muted" Text="المتبقي" />
-                    <TextBlock Classes="tile-value"
-                               Text="{Binding AmountDueText}"
-                               Foreground="#D24726" />
+                <StackPanel Spacing="{StaticResource SpaceXs}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding !FilteredProducts.Count}">
+                    <PathIcon Data="{StaticResource IconSearch}"
+                              Width="40"
+                              Height="40"
+                              Opacity="0.35"
+                              HorizontalAlignment="Center" />
+                    <TextBlock Text="لا توجد أصناف مطابقة"
+                               Classes="subtitle"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="جرّب اسمًا آخر أو امسح الباركود"
+                               Classes="caption"
+                               HorizontalAlignment="Center" />
                 </StackPanel>
             </Grid>
-        </Border>
-
-        <!-- cart -->
-        <Border Grid.Row="1" Classes="card" Margin="0,0,0,12">
-            <DataGrid ItemsSource="{Binding Cart}" AutoGenerateColumns="False">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="الصنف" Binding="{Binding Name}" Width="2*" />
-                    <DataGridTextColumn Header="الكمية" Binding="{Binding QuantityText}" Width="100" />
-                    <DataGridTextColumn Header="وحدة" Binding="{Binding UnitName}" Width="90" />
-                    <DataGridTextColumn Header="السعر" Binding="{Binding UnitPriceText}" Width="100" />
-                    <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotalText}" Width="110" />
-                    <DataGridTemplateColumn Header="" Width="50">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="vm:CartLine">
-                                <Button Classes="ghost" Padding="6,0" Content="✕"
-                                        Command="{Binding $parent[Window].((vm:SellViewModel)DataContext).RemoveLineCommand}"
-                                        CommandParameter="{Binding}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                </DataGrid.Columns>
-            </DataGrid>
-        </Border>
-
-        <!-- add product + save -->
-        <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10">
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <TextBlock Text="بحث:" VerticalAlignment="Center" />
-                <TextBox Text="{Binding Search}" PlaceholderText="اسم الصنف أو الكود" Width="240" />
-            </StackPanel>
-
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <AutoCompleteBox ItemsSource="{Binding Products}"
-                                 SelectedItem="{Binding SelectedProduct}"
-                                 PlaceholderText="اكتب اسم الصنف أو الكود"
-                                 Width="300">
-                    <AutoCompleteBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ProductOption">
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="{Binding Display}" />
-                                <TextBlock Classes="muted"
-                                           Text="{Binding OnHand, StringFormat='متاح: {0}'}" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </AutoCompleteBox.ItemTemplate>
-                </AutoCompleteBox>
-
-                <TextBox Text="{Binding Quantity}" Width="80" PlaceholderText="كمية" />
-                <Button Content="إضافة" Command="{Binding AddToCartCommand}" />
-            </StackPanel>
-
-
-            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8">
-                <Button Classes="ghost" Content="تفريغ" Command="{Binding ClearCommand}" />
-                <Button Classes="primary" Content="حفظ الفاتورة"
-                        Command="{Binding PostCommand}" IsEnabled="{Binding CanPost}" />
-            </StackPanel>
         </Grid>
 
-        <!-- how the sale is settled: fully, partly, or on account -->
-        <Border Grid.Row="3" Classes="card" Margin="0,12,0,0">
-            <StackPanel Spacing="10">
-                <Grid ColumnDefinitions="220,280,*,140" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Classes="muted" Text="التحصيل" />
-                        <ComboBox ItemsSource="{Binding Settlement.Choices}"
-                                  SelectedItem="{Binding Settlement.Choice}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SettlementOption">
-                                    <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </StackPanel>
+        <!-- ========================================================
+             Order panel: header → lines → checkout
+             ======================================================== -->
+        <Border Grid.Column="1" Classes="panel">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" MinHeight="140" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Column="1" Spacing="2"
-                                IsVisible="{Binding Settlement.IsActive}">
-                        <TextBlock Classes="muted" Text="طريقة الدفع" />
-                        <ComboBox ItemsSource="{Binding Settlement.Methods}"
-                                  SelectedItem="{Binding Settlement.Method}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:MethodOption">
-                                    <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </StackPanel>
+                <!-- Header -->
+                <Grid Grid.Row="0"
+                      ColumnSpacing="{StaticResource SpaceSm}"
+                      Margin="16,14,16,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="سلة المشتريات"
+                               Classes="subtitle"
+                               VerticalAlignment="Center" />
 
-                    <StackPanel Grid.Column="2" Spacing="2"
-                                IsVisible="{Binding Settlement.IsActive}">
-                        <TextBlock Classes="muted" Text="الحساب اللي الفلوس هتوصله" />
-                        <ComboBox ItemsSource="{Binding Settlement.Accounts}"
-                                  SelectedItem="{Binding Settlement.Account}"
-                                  PlaceholderText="اختار الحساب">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:AccountRow">
-                                    <TextBlock Text="{Binding Name}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </StackPanel>
+                    <Border Grid.Column="1"
+                            Classes="badge count"
+                            IsVisible="{Binding Cart.Count}">
+                        <TextBlock Text="{Binding Cart.Count}" />
+                    </Border>
 
-                    <StackPanel Grid.Column="3" Spacing="2"
-                                IsVisible="{Binding Settlement.IsPartial}">
-                        <TextBlock Classes="muted" Text="المبلغ المدفوع دلوقتي" />
-                        <TextBox Text="{Binding Settlement.PartialAmount}"
-                                 PlaceholderText="0.00" />
+                    <StackPanel Grid.Column="3"
+                                Orientation="Horizontal"
+                                Spacing="{StaticResource SpaceXs}"
+                                VerticalAlignment="Center"
+                                IsVisible="{Binding Cart.Count}">
+                        <Button Classes="ghost"
+                                Command="{Binding RequestClearCommand}"
+                                IsVisible="{Binding !IsClearConfirmVisible}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <PathIcon Data="{StaticResource IconTrash}"
+                                          Width="14"
+                                          Height="14" />
+                                <TextBlock Text="تفريغ السلة"
+                                           Classes="caption"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="{StaticResource SpaceXs}"
+                                    IsVisible="{Binding IsClearConfirmVisible}">
+                            <Button Classes="danger"
+                                    Content="تأكيد التفريغ"
+                                    Command="{Binding ClearCommand}" />
+                            <Button Classes="ghost"
+                                    Content="إلغاء"
+                                    Command="{Binding CancelClearCommand}" />
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
 
-                <TextBlock Classes="muted" TextWrapping="Wrap"
-                           Text="البيع على الحساب بيخلي العميل مدين لك. لو دفعت جزء، الباقي بيفضل عليك لحد ما تلمعه من شاشة المقبوضات." />
+                <!-- Empty cart -->
+                <StackPanel Grid.Row="1"
+                            Spacing="{StaticResource SpaceXs}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding !Cart.Count}">
+                    <PathIcon Data="{StaticResource IconCart}"
+                              Width="40"
+                              Height="40"
+                              Opacity="0.35"
+                              HorizontalAlignment="Center" />
+                    <TextBlock Text="السلة فارغة"
+                               Classes="subtitle"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="اضغط على أي صنف أو امسح الباركود لإضافته"
+                               Classes="caption"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               MaxWidth="260"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
 
-                <TextBlock Classes="muted" Text="{Binding Settlement.Problem}"
-                           IsVisible="{Binding Settlement.Problem,
-                                Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-            </StackPanel>
+                <!-- Cart lines -->
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              IsVisible="{Binding Cart.Count}">
+                    <ItemsControl ItemsSource="{Binding Cart}"
+                                  Margin="8,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:CartLine">
+                                <Border Classes="divider-bottom"
+                                        Padding="{StaticResource RowPadding}">
+                                    <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+                                          RowSpacing="{StaticResource SpaceXs}">
+
+                                        <!-- name | line total -->
+                                        <Grid Grid.Row="0"
+                                              ColumnSpacing="{StaticResource SpaceMd}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}"
+                                                       Classes="strong"
+                                                       TextWrapping="Wrap"
+                                                       MaxLines="2"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding LineTotalText}"
+                                                       Classes="strong"
+                                                       FontWeight="Bold"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+
+                                        <!-- unit price -->
+                                        <Grid Grid.Row="1"
+                                              ColumnSpacing="{StaticResource SpaceSm}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding PriceByQuantityText, StringFormat='{}{}{0}'}"
+                                                       Classes="caption" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding UnitName}"
+                                                       Classes="caption"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+
+                                        <!-- unit | quantity controls | delete -->
+                                        <Grid Grid.Row="2"
+                                              ColumnSpacing="{StaticResource SpaceSm}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox ItemsSource="{Binding AvailableUnits}"
+                                                      SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
+                                                      DisplayMemberBinding="{Binding UnitName}"
+                                                      MinWidth="75"
+                                                      Height="28"
+                                                      Padding="6,2"
+                                                      FontSize="12"
+                                                      VerticalAlignment="Center"
+                                                      ToolTip.Tip="تغيير وحدة القياس" />
+
+                                            <StackPanel Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center"
+                                                        Spacing="6">
+                                                <Button Classes="icon"
+                                                        Command="{Binding $parent[UserControl].((vm:SellViewModel)DataContext).DecrementLineCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="تقليل الكمية">
+                                                    <TextBlock Text="−"
+                                                               FontSize="20"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Center" />
+                                                </Button>
+
+                                                <TextBox Text="{Binding QuantityInput, Mode=TwoWay}"
+                                                         MinWidth="52"
+                                                         Width="56"
+                                                         Height="28"
+                                                         Padding="4,2"
+                                                         TextAlignment="Center"
+                                                         VerticalContentAlignment="Center"
+                                                         FontSize="13"
+                                                         FontWeight="SemiBold"
+                                                         ToolTip.Tip="تعديل الكمية مباشرة" />
+
+                                                <Button Classes="icon"
+                                                        Command="{Binding $parent[UserControl].((vm:SellViewModel)DataContext).IncrementLineCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="زيادة الكمية">
+                                                    <TextBlock Text="+"
+                                                               FontSize="20"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Center" />
+                                                </Button>
+                                            </StackPanel>
+
+                                            <Button Grid.Column="2"
+                                                    Classes="icon remove"
+                                                    Command="{Binding $parent[UserControl].((vm:SellViewModel)DataContext).RemoveLineCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip.Tip="حذف الصنف من السلة">
+                                                <PathIcon Data="{StaticResource IconTrash}"
+                                                          Width="16"
+                                                          Height="16" />
+                                            </Button>
+                                        </Grid>
+
+                                        <!-- Existing line discount, when present -->
+                                        <TextBlock Grid.Row="3"
+                                                   Text="{Binding DiscountSummaryText, StringFormat='خصم: {}{0}'}"
+                                                   Classes="caption success"
+                                                   IsVisible="{Binding HasDiscount}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Checkout footer -->
+                <Border Grid.Row="2"
+                        Classes="divider-top"
+                        Padding="{StaticResource CardPadding}">
+                    <StackPanel Spacing="{StaticResource SpaceMd}">
+
+                        <!-- Customer -->
+                        <Grid RowDefinitions="Auto,Auto"
+                              RowSpacing="{StaticResource SpaceXs}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{StaticResource FieldLabelWidth}" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="العميل"
+                                       Classes="caption"
+                                       VerticalAlignment="Center" />
+
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding Customers}"
+                                      SelectedItem="{Binding SelectedCustomer}"
+                                      HorizontalAlignment="Stretch"
+                                      MinHeight="{StaticResource ControlHeight}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:PartyOption">
+                                        <TextBlock Text="{Binding Display}"
+                                                   Classes="body" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+
+                            <StackPanel Grid.Row="1"
+                                        Grid.Column="1">
+                                <TextBlock Text="{Binding SelectedCustomerBalanceText}"
+                                           Classes="caption danger"
+                                           FontWeight="SemiBold"
+                                           IsVisible="{Binding IsSelectedCustomerInDebt}" />
+                                <TextBlock Text="{Binding SelectedCustomerBalanceText}"
+                                           Classes="caption success"
+                                           FontWeight="SemiBold"
+                                           IsVisible="{Binding IsSelectedCustomerInCredit}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Settlement -->
+                        <StackPanel Spacing="{StaticResource SpaceSm}">
+                            <Grid ColumnSpacing="{StaticResource SpaceSm}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="{StaticResource FieldLabelWidth}" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="الدفع"
+                                           Classes="caption"
+                                           VerticalAlignment="Center" />
+
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{Binding Settlement.Choices}"
+                                          SelectedItem="{Binding Settlement.Choice}"
+                                          HorizontalAlignment="Stretch"
+                                          MinHeight="{StaticResource ControlHeight}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SettlementOption">
+                                            <TextBlock Text="{Binding Label}"
+                                                       Classes="body" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Partial amount -->
+                            <Grid ColumnSpacing="{StaticResource SpaceSm}"
+                                  IsVisible="{Binding Settlement.IsPartial}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="{StaticResource FieldLabelWidth}" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="مبلغ الدفع الجزئي"
+                                           Classes="caption"
+                                           VerticalAlignment="Center" />
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding Settlement.PartialAmount}"
+                                         PlaceholderText="مثلاً 500"
+                                         HorizontalAlignment="Stretch"
+                                         MinHeight="{StaticResource ControlHeight}" />
+                                <TextBlock Grid.Column="2"
+                                           Text="ج.م"
+                                           Classes="caption"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+
+                            <!-- Payment method (Cash vs Wallet only) -->
+                            <Grid ColumnSpacing="{StaticResource SpaceSm}"
+                                  IsVisible="{Binding Settlement.IsActive}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="{StaticResource FieldLabelWidth}" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="طريقة الدفع"
+                                           Classes="caption"
+                                           VerticalAlignment="Center" />
+
+                                <Grid Grid.Column="1" ColumnDefinitions="*,*">
+                                    <Button Grid.Column="0"
+                                            Content="💵 كاش (الخزينة)"
+                                            Command="{Binding Settlement.SelectCashCommand}"
+                                            Classes.accent="{Binding Settlement.IsCashMethod}"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Center"
+                                            MinHeight="{StaticResource ControlHeight}"
+                                            Margin="0,0,3,0" />
+                                    <Button Grid.Column="1"
+                                            Content="📱 محفظة إلكترونية"
+                                            Command="{Binding Settlement.SelectWalletCommand}"
+                                            Classes.accent="{Binding Settlement.IsWalletMethod}"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Center"
+                                            MinHeight="{StaticResource ControlHeight}"
+                                            Margin="3,0,0,0" />
+                                </Grid>
+                            </Grid>
+
+                            <!-- Destination wallet (only shown when Wallet is chosen; Cash defaults to Cashier automatically) -->
+                            <Grid ColumnSpacing="{StaticResource SpaceSm}"
+                                  IsVisible="{Binding Settlement.IsWalletMethod}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="{StaticResource FieldLabelWidth}" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="المحفظة"
+                                           Classes="caption"
+                                           VerticalAlignment="Center" />
+
+                                <Grid Grid.Column="1" RowDefinitions="Auto,Auto" RowSpacing="4">
+                                    <Grid ColumnDefinitions="*,*">
+                                        <Button Grid.Column="0"
+                                                Content="فودافون كاش"
+                                                Command="{Binding Settlement.SelectVodafoneCashCommand}"
+                                                Classes.accent="{Binding Settlement.IsVodafoneCashActive}"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Center"
+                                                MinHeight="{StaticResource ControlHeight}"
+                                                Margin="0,0,2,0" />
+                                        <Button Grid.Column="1"
+                                                Content="انستاباي"
+                                                Command="{Binding Settlement.SelectInstapayCommand}"
+                                                Classes.accent="{Binding Settlement.IsInstapayActive}"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Center"
+                                                MinHeight="{StaticResource ControlHeight}"
+                                                Margin="2,0,0,0" />
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+
+                            <TextBlock Classes="error"
+                                       Text="{Binding Settlement.Problem}"
+                                       IsVisible="{Binding Settlement.Problem, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </StackPanel>
+
+                        <!-- Totals -->
+                        <StackPanel Spacing="{StaticResource SpaceXs}">
+                            <Grid>
+                                <Grid.ColumnDefinitions> 
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Text="المجموع الفرعي"
+                                           Classes="caption"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding SubtotalText}"
+                                           Classes="body" />
+                            </Grid>
+
+                            <!-- Invoice Discount Input -->
+                            <Grid Margin="0,4,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="110" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="خصم الفاتورة"
+                                           Classes="caption"
+                                           VerticalAlignment="Center" />
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding InvoiceDiscountText, Mode=TwoWay}"
+                                         PlaceholderText="0.00"
+                                         Height="28"
+                                         Padding="6,2"
+                                         TextAlignment="Right"
+                                         VerticalContentAlignment="Center"
+                                         FontSize="12" />
+                            </Grid>
+                            <TextBlock Classes="error"
+                                       FontSize="11"
+                                       Margin="0,-2,0,2"
+                                       Text="{Binding InvoiceDiscountError}"
+                                       IsVisible="{Binding InvoiceDiscountError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                            <Grid IsVisible="{Binding HasTotalDiscount}">
+                                <Grid.ColumnDefinitions> 
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Text="إجمالي الخصم"
+                                           Classes="caption"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Classes="strong success"
+                                           Text="{Binding TotalDiscountText, StringFormat='- {}{0}'}" />
+                            </Grid>
+
+                            <Grid ColumnSpacing="6"
+                                  Margin="0,6,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                  
+                                <TextBlock Text="الإجمالي"
+                                           Classes="subtitle"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding TotalText}"
+                                           Classes="display"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2"
+                                           Text="ج.م"
+                                           Classes="caption"
+                                           VerticalAlignment="Bottom"
+                                           Margin="0,0,0,7" />
+                            </Grid>
+
+                            <Grid IsVisible="{Binding IsPaymentDeferredOrPartial}">
+                                <Grid.ColumnDefinitions> 
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="المتبقي على العميل"
+                                           Classes="caption"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding AmountDueText}"
+                                           Classes="strong caution"
+                                           FontWeight="Bold" />
+                            </Grid>
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding Status}"
+                                   Classes="caption"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                        <!-- Checkout -->
+                        <Button Classes="accent"
+                                Command="{Binding PostCommand}"
+                                IsEnabled="{Binding CanPostNow}"
+                                Height="{StaticResource ControlHeightLg}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center">
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="10"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <ui:FAProgressRing Width="20"
+                                                   Height="20"
+                                                   IsIndeterminate="True"
+                                                   IsVisible="{Binding Busy}" />
+                                <PathIcon Data="{StaticResource IconCheck}"
+                                          Width="20"
+                                          Height="20"
+                                          IsVisible="{Binding !Busy}" />
+                                <TextBlock Text="إتمام البيع"
+                                           FontSize="{StaticResource FontSizeSubtitle}"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Border>
-
     </Grid>
 </UserControl>

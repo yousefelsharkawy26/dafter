@@ -64,13 +64,16 @@
         <Setter Property="BorderThickness" Value="0,0,0,2" />
     </Style>
     <Style Selector="Border.app-bar Button.ghost">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="#E0E0E0" />
-        <Setter Property="BorderBrush" Value="#555555" />
+        <Setter Property="Background" Value="#2D2D2D" />
+        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="BorderBrush" Value="#666666" />
+    </Style>
+    <Style Selector="Border.app-bar Button.ghost /template/ ContentPresenter">
+        <Setter Property="TextBlock.Foreground" Value="#FFFFFF" />
     </Style>
     <Style Selector="Border.app-bar Button.ghost:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#333333" />
-        <Setter Property="BorderBrush" Value="#777777" />
+        <Setter Property="Background" Value="#0078D7" />
+        <Setter Property="BorderBrush" Value="#0078D7" />
         <Setter Property="TextBlock.Foreground" Value="#FFFFFF" />
     </Style>
 
@@ -130,7 +133,7 @@
     <!-- Tab close button: Metro red hover -->
     <Style Selector="Button.tab-close">
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="#777777" />
+        <Setter Property="Foreground" Value="#eeeeee" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="CornerRadius" Value="0" />
         <Setter Property="Padding" Value="4,0" />
@@ -215,15 +218,23 @@
         <Setter Property="Foreground" Value="#F0FFFFFF" />
     </Style>
 
-    <!-- Typography for tile-value and tile-label outside of Border.tile -->
+    <!-- Typography for tile-value and tile-label outside of Border.tile (on white/light cards) -->
     <Style Selector="TextBlock.tile-value">
         <Setter Property="FontSize" Value="26" />
         <Setter Property="FontWeight" Value="Bold" />
-        <Setter Property="Foreground" Value="#0078D7" />
+        <Setter Property="Foreground" Value="#1F1F1F" />
+        <Setter Property="FlowDirection" Value="LeftToRight" />
     </Style>
     <Style Selector="TextBlock.tile-label">
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="Foreground" Value="#666666" />
+        <Setter Property="Foreground" Value="#444444" />
+    </Style>
+    <!-- Override back to white inside coloured tiles -->
+    <Style Selector="Border.tile TextBlock.tile-value">
+        <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+    <Style Selector="Border.tile TextBlock.tile-label">
+        <Setter Property="Foreground" Value="#F0FFFFFF" />
     </Style>
 
     <!-- ==============================================

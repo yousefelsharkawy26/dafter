@@ -22,6 +22,8 @@ public static class Bootstrap
 
         services.AddDaftarPersistence(DaftarPaths.DatabasePath);
 
+        services.AddSingleton<Daftar.Services.INavigationService, Daftar.Services.NavigationService>();
+
         // View models are resolved per page by TabHost. Transient so each tab gets a fresh one.
         services.AddTransient<LoginViewModel>();
         services.AddTransient<MainWindowViewModel>();
@@ -30,6 +32,12 @@ public static class Bootstrap
         services.AddTransient<ProductsViewModel>();
         services.AddTransient<ReceiveViewModel>();
         services.AddTransient<PaymentsViewModel>();
+        services.AddTransient<PartiesViewModel>();
+        services.AddTransient<StockViewModel>();
+        services.AddTransient<SettingsViewModel>();
+        services.AddTransient<ReportsViewModel>();
+        services.AddTransient<ReturnsViewModel>();
+        services.AddTransient<SessionsViewModel>();
 
         return services.BuildServiceProvider();
     }

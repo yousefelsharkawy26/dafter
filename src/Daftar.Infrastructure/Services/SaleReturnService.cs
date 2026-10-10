@@ -8,6 +8,8 @@ namespace Daftar.Infrastructure.Services;
 
 public sealed record ReturnedLine(int SaleItemId, int LotId, decimal Quantity);
 
+public sealed record ReturnItemRequest(int OriginalSaleItemId, decimal Quantity);
+
 public sealed record SaleReturnDraftResult(int SaleId, IReadOnlyList<ReturnedLine> Lines);
 
 /// <summary>
@@ -27,6 +29,8 @@ public sealed class SaleReturnService(DaftarContext context)
         int originalSaleId,
         DateOnly businessDate,
         int userId,
+        IReadOnlyList<ReturnItemRequest>? requestedItems = null,
+        string? notes = null,
         CancellationToken cancellationToken = default)
     {
         // Product and ProductUnit are needed to build the return lines. There is no lazy loading here,
@@ -61,7 +65,7 @@ public sealed class SaleReturnService(DaftarContext context)
             DistributorId = original.DistributorId,
             DistributorSessionId = original.DistributorSessionId,
             DocDate = businessDate,
-            Notes = $"Return against {original.DocNo}",
+            Notes = notes ?? $"Return against {original.DocNo}",
         };
         context.Sales.Add(returnSale);
         await context.SaveChangesAsync(cancellationToken);
@@ -74,23 +78,63 @@ public sealed class SaleReturnService(DaftarContext context)
             var product = source.Product ?? throw new DomainException($"Product {source.ProductId} is missing.");
             var unit = source.ProductUnit ?? throw new DomainException($"Unit {source.ProductUnitId} is missing.");
 
-            foreach (var draw in source.Lots)
+            var factor = unit.Factor > 0m ? unit.Factor : 1m;
+            var totalStillOut = Rounding.Quantity(source.Lots.Sum(d => d.BaseQuantity) - returnedSoFar);
+            if (totalStillOut <= 0m)
+                continue;
+
+            decimal requestedQty;
+            if (requestedItems != null)
             {
-                var stillOut = Rounding.Quantity(draw.BaseQuantity - returnedSoFar);
-                if (stillOut <= 0m)
+                var req = requestedItems.FirstOrDefault(r => r.OriginalSaleItemId == source.Id);
+                if (req == null || req.Quantity <= 0m)
                     continue;
 
-                // Credit at what was charged, not at today's list price.
-                var line = returnSale.AddItem(
-                    product,
-                    unit,
-                    quantity: stillOut,
-                    listPrice: source.UnitPrice,
-                    unitPrice: source.UnitPrice,
-                    originalSaleItemId: source.Id);
+                var maxUnitQty = Rounding.Quantity(totalStillOut / factor);
+                requestedQty = Math.Min(req.Quantity, maxUnitQty);
+            }
+            else
+            {
+                requestedQty = Rounding.Quantity(totalStillOut / factor);
+            }
 
-                line.AddLot(draw.LotId, stillOut, draw.UnitCost);
-                mirrored.Add(new ReturnedLine(source.Id, draw.LotId, stillOut));
+            if (requestedQty <= 0m)
+                continue;
+
+            var baseQtyNeeded = Rounding.Quantity(requestedQty * factor);
+
+            // Credit at what was charged, not at today's list price.
+            var line = returnSale.AddItem(
+                product,
+                unit,
+                quantity: requestedQty,
+                listPrice: source.UnitPrice,
+                unitPrice: source.UnitPrice,
+                originalSaleItemId: source.Id);
+
+            var remainingToAllocate = baseQtyNeeded;
+            var lotReturnedSoFar = returnedSoFar;
+
+            foreach (var draw in source.Lots)
+            {
+                if (remainingToAllocate <= 0m)
+                    break;
+
+                var stillOutInLot = Rounding.Quantity(draw.BaseQuantity - lotReturnedSoFar);
+                if (stillOutInLot <= 0m)
+                {
+                    lotReturnedSoFar = Rounding.Quantity(lotReturnedSoFar - draw.BaseQuantity);
+                    continue;
+                }
+                lotReturnedSoFar = 0m;
+
+                var takeFromLot = Math.Min(stillOutInLot, remainingToAllocate);
+                if (takeFromLot <= 0m)
+                    continue;
+
+                line.AddLot(draw.LotId, takeFromLot, draw.UnitCost);
+                mirrored.Add(new ReturnedLine(source.Id, draw.LotId, takeFromLot));
+                remainingToAllocate = Rounding.Quantity(remainingToAllocate - takeFromLot);
             }
         }
 

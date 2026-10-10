@@ -25,9 +25,15 @@ public enum SettlementChoice
 /// <summary>Arabic labels and account rules for a way of paying.</summary>
 public static class PaymentMethods
 {
+    public static readonly IReadOnlyList<PaymentMethod> Supported =
+    [
+        PaymentMethod.Cash,
+        PaymentMethod.Wallet,
+    ];
+
     public static string Label(this PaymentMethod method) => method switch
     {
-        PaymentMethod.Cash => "كاش",
+        PaymentMethod.Cash => "كاش (الخزينة النقدية)",
         PaymentMethod.Wallet => "محفظة إلكترونية (فودافون كاش / انستاباي)",
         PaymentMethod.Card => "فيزا / ماستركارد",
         PaymentMethod.Transfer => "تحويل بنكي",
@@ -44,7 +50,7 @@ public static class PaymentMethods
         PaymentMethod.Cash => [CashAccountType.Cash],
         PaymentMethod.Wallet => [CashAccountType.Wallet],
         PaymentMethod.Card or PaymentMethod.Transfer or PaymentMethod.Cheque => [CashAccountType.Bank],
-        _ => [CashAccountType.Cash, CashAccountType.Bank, CashAccountType.Wallet],
+        _ => [CashAccountType.Cash, CashAccountType.Wallet],
     };
 }
 

@@ -47,6 +47,9 @@ public sealed class ProductUnit : IAuditable, IDomainValidatable
     /// <summary>Per unit: piece and case carry different barcodes.</summary>
     public string? Barcode { get; set; }
 
+    /// <summary>Standard purchase cost for this unit. Used in receiving and as cost baseline.</summary>
+    public decimal PurchasePrice { get; set; }
+
     public bool IsDefaultSale { get; set; }
     public bool IsDefaultPurchase { get; set; }
     public bool IsActive { get; set; } = true;
@@ -70,5 +73,7 @@ public sealed class ProductUnit : IAuditable, IDomainValidatable
             throw new DomainException("Unit name is required.");
         if (Factor <= 0m)
             throw new DomainException($"Unit '{Name}' has Factor {Factor}; must be > 0.");
+        if (PurchasePrice < 0m)
+            throw new DomainException($"Unit '{Name}' has negative purchase price {PurchasePrice}.");
     }
 }
