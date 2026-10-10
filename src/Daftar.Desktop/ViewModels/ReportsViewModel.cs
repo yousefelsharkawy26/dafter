@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Daftar.Domain.Finance;
 using Daftar.Domain.Sales;
+using Daftar.Domain.Security;
 using Daftar.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -130,6 +131,25 @@ public partial class ReportsViewModel(IServiceProvider services) : ObservableObj
     [ObservableProperty] private ReportSaleRow? _selectedSale;
     [ObservableProperty] private bool _isSaleDetailsOpen;
     public ObservableCollection<ReportSaleItemRow> SelectedSaleItems { get; } = [];
+
+    /// <summary>
+    /// Whether the signed-in role may see what the goods cost. Cost, margin and profit are the
+    /// owner's numbers: a cashier who can read them knows the price to beat and the margin to
+    /// squeeze. Without Reports.Cost the reports still show revenue, and nothing that reveals cost.
+    ///
+    /// This is a screen-level control, not a boundary. The database is a local file the operator
+    /// owns, so what it stops is a cashier opening the reports screen, not a determined user with
+    /// a file manager.
+    /// </summary>
+    [ObservableProperty] private bool _canViewCost;
+
+    private const string Hidden = "—";
+
+    /// <summary>Formats a cost, margin or profit figure, or hides it.</summary>
+    private string Money(decimal value) => CanViewCost ? $"{value:N2} ج.م" : Hidden;
+
+    /// <summary>Zeroes a figure so the value itself never reaches a row that lacks permission to see it.</summary>
+    private decimal Cost(decimal value) => CanViewCost ? value : 0m;
 
     // ── Computed Tab Booleans ─────────────────────────────────────────────────
     public bool IsSalesTabActive => SelectedTabIndex == 0;
@@ -298,10 +318,10 @@ public partial class ReportsViewModel(IServiceProvider services) : ObservableObj
                     $"{i.UnitPrice:N2} ج.م",
                     i.LineTotal,
                     $"{i.LineTotal:N2} ج.م",
-                    i.CostTotal,
-                    $"{i.CostTotal:N2} ج.م",
-                    margin,
-                    $"{margin:N2} ج.م"));
+                    Cost(i.CostTotal),
+                    Money(i.CostTotal),
+                    Cost(margin),
+                    Money(margin)));
             }
         }
         catch
@@ -323,6 +343,11 @@ public partial class ReportsViewModel(IServiceProvider services) : ObservableObj
 
             using var scope = _services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+
+            // Resolved per load, not cached for the lifetime of the view model: a role can be
+            // edited while the window is open, and the next refresh should reflect that.
+            CanViewCost = _services.GetService<IUserAuthorizer>() is { } authorizer
+                && await authorizer.CanAsync(Role.Codes.ReportsCost);
 
             // 1. Sales in range
             var sales = await db.Sales
@@ -356,26 +381,26 @@ public partial class ReportsViewModel(IServiceProvider services) : ObservableObj
                     s.Party?.Name ?? "عميل نقدي",
                     s.Total,
                     $"{s.Total:N2} ج.م",
-                    cost,
-                    $"{cost:N2} ج.م",
-                    margin,
-                    $"{margin:N2} ج.م",
-                    $"{marginPct:N1}%",
-                    color);
+                    Cost(cost),
+                    Money(cost),
+                    Cost(margin),
+                    Money(margin),
+                    CanViewCost ? $"{marginPct:N1}%" : Hidden,
+                    CanViewCost ? color : "#9E9E9E");
 
                 _allSaleRows.Add(row);
                 SaleRows.Add(row);
                 totalSales += s.Total;
-                totalCost += cost;
+                totalCost += CanViewCost ? cost : 0m;
             }
 
             var totalMargin = totalSales - totalCost;
             var overallMarginPct = totalSales > 0 ? (totalMargin / totalSales) * 100m : 0m;
 
             TotalSalesText = $"{totalSales:N2} ج.م";
-            TotalCostText = $"{totalCost:N2} ج.م";
-            TotalMarginText = $"{totalMargin:N2} ج.م";
-            MarginPercentText = $"{overallMarginPct:N1}% هامش";
+            TotalCostText = Money(totalCost);
+            TotalMarginText = Money(totalMargin);
+            MarginPercentText = CanViewCost ? $"{overallMarginPct:N1}% هامش" : "مخفي";
             InvoicesCountText = $"{sales.Count} فاتورة";
 
             // 2. Collections in range (PaymentIn)
@@ -433,12 +458,12 @@ public partial class ReportsViewModel(IServiceProvider services) : ObservableObj
                     $"{p.Qty:G29}",
                     p.Revenue,
                     $"{p.Revenue:N2} ج.م",
-                    p.Cost,
-                    $"{p.Cost:N2} ج.م",
-                    p.Profit,
-                    $"{p.Profit:N2} ج.م",
-                    $"{p.MarginPct:N1}%",
-                    p.Profit >= 0 ? "#107C41" : "#D13438"));
+                    Cost(p.Cost),
+                    Money(p.Cost),
+                    Cost(p.Profit),
+                    Money(p.Profit),
+                    CanViewCost ? $"{p.MarginPct:N1}%" : Hidden,
+                    CanViewCost ? (p.Profit >= 0 ? "#107C41" : "#D13438") : "#9E9E9E"));
             }
 
             // 4. Overdue Receivables

@@ -85,8 +85,10 @@
                 </StackPanel>
             </Border>
 
-            <!-- Card 2: Cost of Goods -->
-            <Border Grid.Column="1" Classes="panel" Padding="14,12">
+            <!-- Card 2: Cost of Goods. Hidden without Reports.Cost: the column would
+                 otherwise sit there showing dashes and read as a broken figure. -->
+            <Border Grid.Column="1" Classes="panel" Padding="14,12"
+                    IsVisible="{Binding CanViewCost}">
                 <StackPanel Spacing="4">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Text="تكلفة البضاعة المباعة" Classes="caption muted" />
@@ -98,7 +100,8 @@
             </Border>
 
             <!-- Card 3: Net Margin & Profit -->
-            <Border Grid.Column="2" Classes="panel" Padding="14,12">
+            <Border Grid.Column="2" Classes="panel" Padding="14,12"
+                    IsVisible="{Binding CanViewCost}">
                 <StackPanel Spacing="4">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Text="صافي أرباح المبيعات" Classes="caption muted" />
@@ -200,7 +203,7 @@
 
                         <!-- Main Sales Table -->
                         <Border Grid.Row="1" Grid.Column="0" Classes="surface">
-                            <DataGrid ItemsSource="{Binding FilteredSaleRows}"
+                            <DataGrid x:Name="SalesGrid" ItemsSource="{Binding FilteredSaleRows}"
                                       SelectedItem="{Binding SelectedSale, Mode=TwoWay}"
                                       AutoGenerateColumns="False"
                                       IsReadOnly="True"
@@ -293,7 +296,7 @@
                         </Grid>
 
                         <Border Grid.Row="1" Classes="surface">
-                            <DataGrid ItemsSource="{Binding FilteredTopProducts}"
+                            <DataGrid x:Name="ProductsGrid" ItemsSource="{Binding FilteredTopProducts}"
                                       AutoGenerateColumns="False"
                                       IsReadOnly="True"
                                       GridLinesVisibility="Horizontal">

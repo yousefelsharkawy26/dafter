@@ -475,6 +475,106 @@ public sealed class PermissionEnforcementTests : IAsyncLifetime, IDisposable
         }
     }
 
+    [Fact]
+    public async Task Reports_Hide_Cost_And_Margin_From_A_Role_Without_The_Permission()
+    {
+        // Cost, margin and profit were formatted into every row for every role. A cashier could
+        // read what the goods cost, which is the owner's number and the whole negotiation.
+        await EnsureStockAsync();
+        await EnsurePostedSaleAsync();
+
+        var cashierId = await CreateUserAsync("noreportscost", Role.Codes.SalesCreate);
+
+        var vm = await LoadReportsAsAsync(cashierId);
+
+        Assert.False(vm.CanViewCost);
+        Assert.NotEmpty(vm.SaleRows);
+
+        foreach (var row in vm.SaleRows)
+        {
+            // Zeroed, not just unformatted: the figure should not reach the row at all.
+            Assert.Equal(0m, row.Cost);
+            Assert.Equal(0m, row.Margin);
+            Assert.DoesNotContain("0", row.CostText.Replace("0.00", string.Empty));
+        }
+
+        Assert.DoesNotContain("5.00", vm.TotalCostText);
+        Assert.DoesNotContain("5.00", vm.TotalMarginText);
+    }
+
+    [Fact]
+    public async Task Reports_Show_Cost_And_Margin_To_A_Role_That_Has_The_Permission()
+    {
+        // The counterpart, so the test above cannot pass by hiding everything from everyone.
+        await EnsureStockAsync();
+        await EnsurePostedSaleAsync();
+
+        var ownerId = await CreateUserAsync(
+            "reportscost", $"{Role.Codes.SalesCreate},{Role.Codes.ReportsCost}");
+
+        var vm = await LoadReportsAsAsync(ownerId);
+
+        Assert.True(vm.CanViewCost);
+        Assert.NotEmpty(vm.SaleRows);
+        Assert.Contains(vm.SaleRows, row => row.Cost > 0m);
+        Assert.DoesNotContain("—", vm.TotalCostText);
+    }
+
+    private async Task<ReportsViewModel> LoadReportsAsAsync(int userId)
+    {
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(userId);
+        try
+        {
+            var vm = new ReportsViewModel(_services);
+            await vm.LoadAsync();
+            return vm;
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+    }
+
+    /// <summary>A posted invoice over the stock <see cref="EnsureStockAsync"/> left in place.</summary>
+    private async Task EnsurePostedSaleAsync()
+    {
+        using var scope = _services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+
+        if (await ctx.Sales.AnyAsync(s => s.Status == Domain.Shared.DocumentStatus.Posted))
+            return;
+
+        var party = await ctx.Parties.FirstOrDefaultAsync(p => p.IsCustomer);
+        if (party is null)
+        {
+            party = new Party { Code = "P-CUST", Name = "عميل", IsCustomer = true };
+            ctx.Parties.Add(party);
+            await ctx.SaveChangesAsync();
+        }
+
+        var location = await ctx.StockLocations
+            .Where(l => l.Type == StockLocationType.Warehouse)
+            .Select(l => l.Id).FirstAsync();
+
+        var product = await ctx.Products.Include(p => p.Units).FirstAsync();
+        var sale = new Sale
+        {
+            Type = SaleType.Invoice,
+            PartyId = party.Id,
+            LocationId = location,
+            PriceListId = await ctx.PriceLists.Select(p => (int?)p.Id).FirstAsync() ?? 0,
+            DocDate = new DateOnly(2026, 10, 7),
+        };
+
+        // Sold at 10 against a 5 cost, so the margin is visible in the report if it is shown.
+        sale.AddItem(product, product.Units.First(u => u.IsBase), 1m, 10m, 10m);
+        sale.Recalculate();
+        ctx.Sales.Add(sale);
+        await ctx.SaveChangesAsync();
+
+        await new SalePostingService(ctx).PostAsync(sale.Id, 1, sale.DocDate);
+    }
+
     /// <summary>One product with stock on hand, posted while nobody is signed in.</summary>
     private async Task EnsureStockAsync()
     {
