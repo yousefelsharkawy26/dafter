@@ -70,6 +70,8 @@ public sealed class StockCountService(DaftarContext context)
         int userId,
         CancellationToken cancellationToken = default)
     {
+        context.RequirePermission(Daftar.Domain.Security.Role.Codes.StockAdjust);
+
         await using TransactionScope tx = await TransactionScope.BeginAsync(context, cancellationToken);
         try
         {

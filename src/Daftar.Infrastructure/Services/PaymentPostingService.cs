@@ -22,6 +22,8 @@ public sealed class PaymentPostingService(DaftarContext context)
         DateOnly? businessDate = null,
         CancellationToken cancellationToken = default)
     {
+        context.RequirePermission(Daftar.Domain.Security.Role.Codes.PaymentsManage);
+
         await using TransactionScope tx = await TransactionScope.BeginAsync(context, cancellationToken);
         try
         {

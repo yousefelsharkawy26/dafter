@@ -40,6 +40,8 @@ public sealed class Role : IAuditable, IDomainValidatable
     {
         public const string SalesCreate = "Sales.Create";
         public const string SalesCancel = "Sales.Cancel";
+        public const string PurchasesCreate = "Purchases.Create";
+        public const string PaymentsManage = "Payments.Manage";
         public const string PriceOverride = "Price.Override";
         public const string StockAdjust = "Stock.Adjust";
         public const string StockScrap = "Stock.Scrap";
@@ -50,10 +52,14 @@ public sealed class Role : IAuditable, IDomainValidatable
 
         public static readonly string[] All =
         [
-            SalesCreate, SalesCancel, PriceOverride, StockAdjust, StockScrap,
-            PartiesEditCredit, ReportsCost, PeriodUnlock, UsersManage,
+            SalesCreate, SalesCancel, PurchasesCreate, PaymentsManage, PriceOverride,
+            StockAdjust, StockScrap, PartiesEditCredit, ReportsCost, PeriodUnlock, UsersManage,
         ];
 
-        public const string Csv = "Sales.Create,Sales.Cancel,Price.Override,Stock.Adjust,Stock.Scrap,Parties.EditCredit,Reports.Cost,Period.Unlock,Users.Manage";
+        /// <summary>
+        /// The full set, joined once. The seeded Admin role takes this verbatim, so a code added
+        /// above reaches the administrator without a migration or a data fix.
+        /// </summary>
+        public static readonly string Csv = string.Join(',', All);
     }
 }

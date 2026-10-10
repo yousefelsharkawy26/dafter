@@ -2,8 +2,12 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Daftar.Domain.Security;
+using Daftar.Domain.Inventory;
+using Daftar.Domain.Parties;
+using Daftar.Domain.Sales;
+using Daftar.Domain.Security; 
 using Daftar.Infrastructure;
+using Daftar.Infrastructure.Services;
 using Daftar.Infrastructure.Security;
 using Daftar.ViewModels;
 using Microsoft.Data.Sqlite;
@@ -382,6 +386,136 @@ public sealed class PermissionEnforcementTests : IAsyncLifetime, IDisposable
         {
             _services.GetRequiredService<ICurrentUser>().SignOut();
         }
+    }
+
+    [Fact]
+    public async Task Posting_A_Sale_Is_Refused_Without_The_Permission()
+    {
+        // The posting service is the enforcement point, not the sell screen: a screen added later
+        // cannot move stock without passing through here.
+        // The fixture stock is posted before anyone signs in, so the purchase permission
+        // does not interfere with setting up the scenario.
+        await EnsureStockAsync();
+        var cashierId = await CreateUserAsync("nosales", Role.Codes.ReportsCost);
+
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(cashierId);
+        try
+        {
+            using var scope = _services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+
+            var party = new Party
+            {
+                Code = "P-PERM",
+                Name = "عميل",
+                IsCustomer = true,
+                CustomerType = CustomerType.Retail,
+            };
+            ctx.Parties.Add(party);
+            await ctx.SaveChangesAsync();
+
+            var location = await ctx.StockLocations
+                .Where(l => l.Type == StockLocationType.Warehouse)
+                .Select(l => l.Id).FirstAsync();
+
+            var product = await ctx.Products.Include(p => p.Units).FirstAsync();
+            var unit = product.Units.First(u => u.IsBase);
+
+            var sale = new Sale
+            {
+                Type = SaleType.Invoice,
+                PartyId = party.Id,
+                LocationId = location,
+                PriceListId = await ctx.PriceLists.Select(p => (int?)p.Id).FirstAsync() ?? 0,
+                DocDate = new DateOnly(2026, 10, 7),
+            };
+            sale.AddItem(product, unit, quantity: 1m, listPrice: 10m, unitPrice: 10m);
+            sale.Recalculate();
+            ctx.Sales.Add(sale);
+            await ctx.SaveChangesAsync();
+
+            var ex = await Assert.ThrowsAsync<Domain.Shared.DomainException>(() =>
+                new SalePostingService(ctx).PostAsync(sale.Id, 1, sale.DocDate));
+
+            Assert.Contains(Role.Codes.SalesCreate, ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+    }
+
+    [Fact]
+    public async Task Scrap_Is_Refused_Without_Its_Own_Permission()
+    {
+        // Deliberately a different code from Sales.Create: writing goods off is a separate
+        // decision from returning them to a customer, and needs its own authority.
+        await EnsureStockAsync();
+        var clerkId = await CreateUserAsync("noscrapping", Role.Codes.SalesCreate);
+
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(clerkId);
+        try
+        {
+            using var scope = _services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+            var lot = await ctx.Lots.FirstAsync();
+            var location = await ctx.StockBalances
+                .Where(b => b.LotId == lot.Id)
+                .Select(b => b.LocationId).FirstAsync();
+
+            var ex = await Assert.ThrowsAsync<Domain.Shared.DomainException>(() =>
+                new SaleReturnService(ctx).ScrapRestockedAsync(
+                    lot.Id, location, 1m, "Damage", 1, new DateOnly(2026, 10, 7)));
+
+            Assert.Contains(Role.Codes.StockScrap, ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+    }
+
+    /// <summary>One product with stock on hand, posted while nobody is signed in.</summary>
+    private async Task EnsureStockAsync()
+    {
+        using var scope = _services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+
+        if (await ctx.Products.AnyAsync())
+            return;
+
+        var party = new Party
+        {
+            Code = "P-SUP",
+            Name = "مورد",
+            IsSupplier = true,
+        };
+        ctx.Parties.Add(party);
+
+        var product = new Catalog.Product("PERM-1", "صنف");
+        product.Units.Add(new Catalog.ProductUnit
+        {
+            Name = "قطعة",
+            Factor = 1m,
+            IsBase = true,
+        });
+        ctx.Products.Add(product);
+        await ctx.SaveChangesAsync();
+
+        var location = await ctx.StockLocations
+            .Where(l => l.Type == StockLocationType.Warehouse)
+            .Select(l => l.Id).FirstAsync();
+
+        var purchase = new Purchasing.Purchase
+        {
+            SupplierId = party.Id,
+            LocationId = location,
+            DocDate = new DateOnly(2026, 10, 7),
+        };
+        purchase.AddItem(product, product.Units[0], quantity: 10m, unitPrice: 5m);
+        ctx.Purchases.Add(purchase);
+        await ctx.SaveChangesAsync();
+        await new PurchasePostingService(ctx).PostAsync(purchase.Id, 1, purchase.DocDate);
     }
 
     [Fact]

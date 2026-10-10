@@ -28,6 +28,8 @@ public sealed class SalePostingService(DaftarContext context)
         DateOnly? businessDate = null,
         CancellationToken cancellationToken = default)
     {
+        context.RequirePermission(Daftar.Domain.Security.Role.Codes.SalesCreate);
+
         await using TransactionScope tx = await TransactionScope.BeginAsync(context, cancellationToken);
         try
         {

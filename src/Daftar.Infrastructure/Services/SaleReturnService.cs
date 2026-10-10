@@ -33,6 +33,10 @@ public sealed class SaleReturnService(DaftarContext context)
         string? notes = null,
         CancellationToken cancellationToken = default)
     {
+        // A return undoes a sale, so it follows the same permission: a role that may not sell
+        // may not create the credit that reverses one.
+        context.RequirePermission(Daftar.Domain.Security.Role.Codes.SalesCreate);
+
         // Product and ProductUnit are needed to build the return lines. There is no lazy loading here,
         // so everything used below has to be loaded up front.
         var original = await context.Sales
@@ -175,6 +179,10 @@ public sealed class SaleReturnService(DaftarContext context)
         string? note = null,
         CancellationToken cancellationToken = default)
     {
+        // Writing off goods is its own decision, separate from returning them, so it carries its
+        // own permission rather than inheriting Sales.Create.
+        context.RequirePermission(Daftar.Domain.Security.Role.Codes.StockScrap);
+
         if (quantity <= 0m)
             throw new DomainException("A scrap quantity must be positive.");
         if (string.IsNullOrWhiteSpace(reasonCode))

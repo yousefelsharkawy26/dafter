@@ -22,6 +22,21 @@ public sealed class DaftarContext(DbContextOptions<DaftarContext> options) : DbC
     /// </remarks>
     internal int? SignedInUserId => CurrentUserIdentity.Value?.UserId;
 
+    /// <summary>
+    /// Throws unless the signed-in role holds the code. Called by the posting services before they
+    /// move stock or money, so a screen that forgets to check still cannot perform the operation.
+    /// A no-op when nobody is signed in, because seeding and migrations write through here.
+    /// </summary>
+    public void RequirePermission(string permissionCode)
+    {
+        if (SignedInUserId is not { } userId)
+            return;
+
+        if (!RoleGrants(userId, permissionCode))
+            throw new DomainException(
+                $"ليست عندك صلاحية '{permissionCode}'. لو محتاج تعمل كده، كلّم مدير النظام.");
+    }
+
     // Security
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<User> Users => Set<User>();
