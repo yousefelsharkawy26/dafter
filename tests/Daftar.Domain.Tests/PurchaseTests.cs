@@ -1,5 +1,8 @@
+using System;
 using Daftar.Domain.Catalog;
+using Daftar.Domain.Inventory;
 using Daftar.Domain.Purchasing;
+using Daftar.Domain.Shared;
 using Xunit;
 
 namespace Daftar.Domain.Tests;
@@ -55,9 +58,64 @@ public class PurchaseTests
         Assert.Equal(220.55m, purchase.Total);
     }
 
-    [Fact]
-    public void Post_RequiresANumberAndLines()
+    // ---- purchase returns move stock OUT ----
+
+/// <summary>
+/// A supplier return used to be classified as an inbound movement, so posting one *increased*
+/// warehouse stock and created a second batch for goods that were still sitting in the original
+/// one. The same goods then existed twice and the payable ledger disagreed with the stock ledger.
+/// </summary>
+[Theory]
+[InlineData(InventoryMovementKind.PurchaseReturn, false)]
+[InlineData(InventoryMovementKind.Receipt, true)]
+[InlineData(InventoryMovementKind.Opening, true)]
+[InlineData(InventoryMovementKind.SaleReturn, true)]
+[InlineData(InventoryMovementKind.Sale, false)]
+[InlineData(InventoryMovementKind.TransferIn, true)]
+[InlineData(InventoryMovementKind.TransferOut, false)]
+public void Only_A_Receipt_Adds_Stock(InventoryMovementKind kind, bool inbound)
+{
+    Assert.Equal(inbound, InventoryMovement.IsInboundKind(kind));
+}
+
+[Fact]
+public void A_Purchase_Return_Movement_Must_Be_Negative()
+{
+    var quantity = InventoryMovement.SignedQuantity(InventoryMovementKind.PurchaseReturn, 10m);
+
+    Assert.Equal(-10m, quantity);
+}
+
+[Fact]
+public void A_Purchase_Return_Cannot_Carry_A_Positive_Quantity()
+{
+    // The sign check that rejects the wrong direction, so the bug cannot reappear.
+    var movement = new InventoryMovement
     {
+        Kind = InventoryMovementKind.PurchaseReturn,
+        Quantity = 10m,
+    };
+
+    var ex = Assert.Throws<DomainException>(() => movement.Validate());
+    Assert.Contains("inconsistent with the sign", ex.Message, StringComparison.Ordinal);
+}
+
+[Fact]
+public void A_Purchase_Return_Of_A_Damaged_Batch_Still_Validates()
+{
+    var movement = new InventoryMovement
+    {
+        Kind = InventoryMovementKind.PurchaseReturn,
+        Quantity = -10m,
+    };
+
+    // Negative is the only accepted sign, and it must not trip any other rule.
+    movement.Validate();
+}
+
+[Fact]
+public void Post_RequiresANumberAndLines()
+{
         var purchase = new Purchase { DocDate = new DateOnly(2026, 10, 5), SupplierId = 1 };
 
         Assert.Throws<Shared.DomainException>(() => purchase.Post("PO-000001", 1, DateTime.UtcNow));

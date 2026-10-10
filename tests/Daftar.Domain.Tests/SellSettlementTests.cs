@@ -246,4 +246,109 @@ public sealed class SellSettlementTests : IAsyncLifetime, IDisposable
         Assert.Equal(string.Empty, vm.Settlement.PartialAmount);
         Assert.Equal(0m, vm.Total);
     }
+
+    /// <summary>
+    /// "Paid in full" with no cash account selected used to post the sale with no voucher at all:
+    /// the settlement panel returned void and swallowed its own failure, so the cashier saw
+    /// "تم حفظ SO-…" while the customer was booked as owing the whole amount and the till gained
+    /// nothing. Nothing posted unless a voucher was actually written.
+    /// </summary>
+    [Fact]
+    public async Task A_Sale_Chosen_As_Paid_In_Full_Is_Not_Posted_When_No_Account_Is_Chosen()
+    {
+        var vm = await ArrangeAsync();
+        Assert.Equal(100m, vm.Total);
+
+        vm.Settlement.Choice = vm.Settlement.Choices
+            .First(c => c.Value == SettlementChoice.Full);
+
+        // Force the "settle, but nowhere to put the money" state.
+        vm.Settlement.Account = null;
+
+        await vm.PostCommand.ExecuteAsync(null);
+
+        var ctx = _fixture.Services.CreateScope().ServiceProvider.GetRequiredService<DaftarContext>();
+
+        Assert.Empty(await ctx.Sales.ToListAsync());
+        Assert.Empty(await ctx.Payments.ToListAsync());
+        Assert.Empty(await ctx.CashTransactions.ToListAsync());
+        Assert.Equal(0m, await BalanceAsync());
+
+        // And the cashier is told why, rather than being shown a success message.
+        Assert.Contains(vm.Settlement.Problem, vm.Status, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The related atomicity gap: the sale and its voucher used to commit separately, so a failure
+    /// between them left a posted invoice with a receivable and no cash.
+    /// </summary>
+    [Fact]
+    public async Task The_Sale_And_Its_Voucher_Are_One_Unit_Of_Work()
+    {
+        var vm = await ArrangeAsync();
+
+        vm.Settlement.Choice = vm.Settlement.Choices
+            .First(c => c.Value == SettlementChoice.Full);
+
+        await WaitForAsync(() => vm.Settlement.Accounts.Count > 0);
+        vm.Settlement.Account = vm.Settlement.Accounts.First();
+
+        await vm.PostCommand.ExecuteAsync(null);
+
+        var ctx = _fixture.Services.CreateScope().ServiceProvider.GetRequiredService<DaftarContext>();
+
+        // Both sides landed together, and they agree with each other.
+        var sale = Assert.Single(await ctx.Sales.ToListAsync());
+        var payment = Assert.Single(await ctx.Payments.ToListAsync());
+
+        Assert.Equal(Daftar.Domain.Shared.DocumentStatus.Posted, sale.Status);
+        Assert.Equal(Daftar.Domain.Shared.DocumentStatus.Posted, payment.Status);
+        Assert.Equal(sale.Id, payment.SaleId);
+        Assert.Equal(sale.Total, payment.Amount);
+    }
+
+    /// <summary>
+    /// A unit whose price could not be resolved used to arrive at the till priced at zero, which
+    /// posts as a genuine sale worth nothing. Price resolution failures must block the sale
+    /// instead of silently giving the goods away.
+    /// </summary>
+    [Fact]
+    public async Task A_Unit_That_Cannot_Be_Priced_Cannot_Reach_The_Cart()
+    {
+        var vm = await ArrangeAsync();
+
+        var product = Assert.Single(vm.Products);
+
+        // Start from an empty cart so the assertion below is about this add, not the fixture's.
+        vm.ClearCommand.Execute(null);
+        Assert.Empty(vm.Cart);
+
+        // The state price resolution leaves behind when no price row exists for the unit: the
+        // option in the product's own collection is priced at zero.
+        var unpriced = product.AvailableUnits[0] with { Price = 0m };
+        product.AvailableUnits[0] = unpriced;
+        product.SelectedUnit = unpriced;
+        Assert.False(product.SelectedUnit.IsPriced);
+
+        vm.AddProductToCartCommand.Execute(product);
+
+        Assert.Empty(vm.Cart);
+        Assert.Equal(0m, vm.Total);
+        Assert.DoesNotContain("تمت إضافة", vm.Status, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_Priced_Unit_Is_Still_Addable()
+    {
+        var vm = await ArrangeAsync();
+
+        var product = Assert.Single(vm.Products);
+        var unit = product.SelectedUnit!;
+
+        Assert.True(unit.IsPriced);
+
+        vm.AddProductToCartCommand.Execute(product);
+
+        Assert.Single(vm.Cart);
+    }
 }

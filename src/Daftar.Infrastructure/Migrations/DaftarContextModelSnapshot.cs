@@ -131,6 +131,7 @@ namespace Daftar.Infrastructure.Migrations
                         .HasFilter("\"Barcode\" IS NOT NULL");
 
                     b.HasIndex("ProductId")
+                        .IsUnique()
                         .HasFilter("IsBase = 1");
 
                     b.HasIndex("ProductId", "Name")
@@ -279,9 +280,6 @@ namespace Daftar.Infrastructure.Migrations
                     b.Property<int?>("StockCountId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("StockCountId1")
-                        .HasColumnType("INTEGER");
-
                     b.Property<decimal?>("StockShortageValue")
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
@@ -295,9 +293,10 @@ namespace Daftar.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DistributorId")
+                        .IsUnique()
                         .HasFilter("Status = 'Open'");
 
-                    b.HasIndex("StockCountId1");
+                    b.HasIndex("StockCountId");
 
                     b.HasIndex("DistributorId", "Status");
 
@@ -1857,7 +1856,8 @@ namespace Daftar.Infrastructure.Migrations
 
                     b.HasOne("Daftar.Domain.Inventory.StockCount", "StockCount")
                         .WithMany()
-                        .HasForeignKey("StockCountId1");
+                        .HasForeignKey("StockCountId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Distributor");
 

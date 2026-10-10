@@ -14,6 +14,12 @@ public static class DaftarPaths
 
     public static string DatabasePath { get; } = Path.Combine(AppDataDirectory, "daftar.db");
 
+    /// <summary>Where snapshots are written. Shared by the manual backup and the pre-migration one.</summary>
+    public static string BackupDirectory { get; } = Path.Combine(AppDataDirectory, "Backups");
+
+    /// <summary>Where the rolling log files are kept.</summary>
+    public static string LogDirectory { get; } = Path.Combine(AppDataDirectory, "logs");
+
     private static string ResolveAppDataDirectory()
     {
         var root = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)

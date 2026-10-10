@@ -80,10 +80,14 @@ public sealed class StockCountConfig : IEntityTypeConfiguration<StockCount>
 
         b.HasIndex(c => c.DocNo).IsUnique();
         b.HasIndex(c => c.LocationId);
-        b.HasIndex(c => c.DistributorSessionId);
+        // One count per distributor session. Two would settle the same session twice.
+        b.HasIndex(c => c.DistributorSessionId).IsUnique();
 
         b.HasOne(c => c.Location).WithMany().HasForeignKey(c => c.LocationId).OnDelete(DeleteBehavior.Restrict);
-        b.HasOne(c => c.DistributorSession).WithMany().HasForeignKey(c => c.DistributorSessionId).OnDelete(DeleteBehavior.Restrict);
+        // The owning side of the session <-> count link. DistributorSession.StockCountId is the
+        // dependent side; declaring both as owners produced a shadow FK column.
+        b.HasOne(c => c.DistributorSession).WithMany()
+            .HasForeignKey(c => c.DistributorSessionId).OnDelete(DeleteBehavior.Restrict);
 
         b.HasMany(c => c.Items).WithOne(i => i.StockCount!)
             .HasForeignKey(i => i.StockCountId).OnDelete(DeleteBehavior.Cascade);

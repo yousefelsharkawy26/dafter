@@ -237,7 +237,17 @@ public partial class SettlementPanel : ObservableObject
     }
 
     /// <summary>Writes the voucher for whatever was settled, if anything.</summary>
-    public async Task ApplyAsync(
+    /// <summary>
+    /// Writes the voucher for whatever was settled, if anything. Returns false when the panel could
+    /// not produce a valid voucher, leaving the reason in <see cref="Problem"/>.
+    /// </summary>
+    /// <remarks>
+    /// This used to return void and swallow its own failure, so "paid in full" with no cash
+    /// account selected posted the document with no voucher and a receivable for the full amount,
+    /// while the screen reported success. Callers must check the result before telling the user
+    /// the document was saved.
+    /// </remarks>
+    public async Task<bool> TryApplyAsync(
         DaftarContext ctx,
         PaymentDirection direction,
         int partyId,
@@ -248,7 +258,7 @@ public partial class SettlementPanel : ObservableObject
         int userId)
     {
         if (!TryResolve(total, out var amount, out var accountId) || amount <= 0m)
-            return;
+            return false;
 
         var payment = new Payment
         {
@@ -267,6 +277,8 @@ public partial class SettlementPanel : ObservableObject
 
         await new Infrastructure.Services.PaymentPostingService(ctx)
             .PostAsync(payment.Id, userId, today);
+
+        return true;
     }
 
     /// <summary>Returns the panel to "nothing paid" after a successful post.</summary>

@@ -180,7 +180,7 @@ public sealed class SaleReturnService(DaftarContext context)
         if (string.IsNullOrWhiteSpace(reasonCode))
             throw new DomainException("Scrap needs a reason code.");
 
-        await using IDbContextTransaction tx = await TransactionScope.BeginAsync(context, cancellationToken);
+        await using TransactionScope tx = await TransactionScope.BeginAsync(context, cancellationToken);
         try
         {
             var lot = await context.Lots.FirstOrDefaultAsync(l => l.Id == lotId, cancellationToken)
@@ -208,11 +208,11 @@ public sealed class SaleReturnService(DaftarContext context)
             });
 
             await context.SaveChangesAsync(cancellationToken);
-            await TransactionScope.CommitAsync(tx, context, cancellationToken);
+            await tx.CommitAsync(cancellationToken);
         }
         catch
         {
-            await TransactionScope.RollbackAsync(tx, context, cancellationToken);
+            await tx.RollbackAsync(cancellationToken);
             throw;
         }
     }

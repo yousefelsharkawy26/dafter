@@ -66,12 +66,21 @@ public sealed class DistributorSessionConfig : IEntityTypeConfiguration<Distribu
         b.Property(s => s.StockShortageValue).HasPrecision(18, 2);
         b.Property(s => s.CommissionAmount).HasPrecision(18, 2);
 
-        // One open session per distributor. Partial unique index, added in the migration.
-        b.HasIndex(s => s.DistributorId).HasFilter("Status = 'Open'");
+        // One open session per distributor. Two open sessions would make ExpectedCash count the same
+        // period twice and double-charge the commission.
+        b.HasIndex(s => s.DistributorId).IsUnique().HasFilter("Status = 'Open'");
         b.HasIndex(s => new { s.DistributorId, s.Status });
 
         b.HasOne(s => s.Distributor).WithMany(d => d.Sessions)
             .HasForeignKey(s => s.DistributorId).OnDelete(DeleteBehavior.Restrict);
+
+        // The session records which count settled it. This and StockCount.DistributorSessionId
+        // are the same relationship expressed from both ends, and without naming the foreign key
+        // EF invents a shadow column ("StockCountId1") while leaving the real StockCountId
+        // column with no referential integrity behind it — the value would be written with
+        // nothing to enforce or cascade against.
+        b.HasOne(s => s.StockCount).WithMany()
+            .HasForeignKey(s => s.StockCountId).OnDelete(DeleteBehavior.Restrict);
 
         AuditColumns.Map(b);
     }

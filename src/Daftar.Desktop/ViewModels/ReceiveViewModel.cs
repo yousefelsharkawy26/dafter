@@ -671,7 +671,7 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
             using var scope = _services.CreateScope();
             var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
 
-            await using IDbContextTransaction tx = await TransactionScope.BeginAsync(ctx, default);
+            await using TransactionScope tx = await TransactionScope.BeginAsync(ctx, default);
             try
             {
                 var today = DateOnly.FromDateTime(DateTime.Now);
@@ -704,7 +704,7 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
 
                 var result = await new PurchasePostingService(ctx).PostAsync(purchase.Id, userId: 1, today);
 
-                await Settlement.ApplyAsync(
+                var settled = await Settlement.TryApplyAsync(
                     ctx,
                     PaymentDirection.Out,
                     purchase.SupplierId,
@@ -713,6 +713,15 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
                     total: purchase.Total,
                     today,
                     userId: 1);
+
+                if (!settled && Settlement.Settlement != SettlementChoice.Deferred)
+                {
+                    // Settling was chosen but no voucher could be written; roll the whole receipt
+                    // back rather than posting stock in with the money unaccounted for.
+                    await tx.RollbackAsync(default);
+                    Status = $"لم يتم حفظ الاستلام: {Settlement.Problem}";
+                    return;
+                }
 
                 // Apply approved reference price updates inside the same transaction
                 if (updatesToApply.Count > 0)
@@ -740,7 +749,7 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
                     await ctx.SaveChangesAsync();
                 }
 
-                await TransactionScope.CommitAsync(tx, ctx, default);
+                await tx.CommitAsync(default);
 
                 var paid = Settlement.Settlement == SettlementChoice.Deferred
                     ? "آجل"
@@ -756,7 +765,7 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
             }
             catch
             {
-                await TransactionScope.RollbackAsync(tx, ctx, default);
+                await tx.RollbackAsync(default);
                 throw;
             }
         }

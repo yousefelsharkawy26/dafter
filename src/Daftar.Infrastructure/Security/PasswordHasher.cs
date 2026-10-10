@@ -12,6 +12,16 @@ public static class PasswordHasher
     private const int SaltBytes = 16;
     private const int HashBytes = 32;
     private const int DefaultIterations = 210_000;
+
+    /// <summary>
+    /// Accepted range for the iteration count stored in a hash. The lower bound rejects rows
+    /// written by some future weaker scheme; the upper bound stops a corrupt or edited row from
+    /// pinning the CPU for seconds on every login attempt, since the count is stored data that
+    /// this method would otherwise obey unconditionally.
+    /// </summary>
+    private const int MinIterations = 100_000;
+    private const int MaxIterations = 2_000_000;
+
     private const string Prefix = "pbkdf2-sha256";
 
     public static string Hash(string password, int iterations = DefaultIterations)
@@ -34,7 +44,8 @@ public static class PasswordHasher
         if (parts.Length != 4 || parts[0] != Prefix)
             return false;
 
-        if (!int.TryParse(parts[1], out var iterations) || iterations < 1)
+        if (!int.TryParse(parts[1], out var iterations)
+            || iterations is < MinIterations or > MaxIterations)
             return false;
 
         byte[] salt, expected;
@@ -47,6 +58,13 @@ public static class PasswordHasher
         {
             return false;
         }
+
+        // A stored digest of the wrong length is corruption, not a valid hash. Without this, a
+        // truncated row ("pbkdf2-sha256$210000$<salt>$", as produced by a partial restore or a
+        // half-finished reset) derives a zero-byte digest and then compares two empty arrays:
+        // FixedTimeEquals(empty, empty) is true, so every password would authenticate.
+        if (salt.Length < SaltBytes || expected.Length != HashBytes)
+            return false;
 
         var actual = Rfc2898DeriveBytes.Pbkdf2(
             Encoding.UTF8.GetBytes(password), salt, iterations, HashAlgorithmName.SHA256, expected.Length);

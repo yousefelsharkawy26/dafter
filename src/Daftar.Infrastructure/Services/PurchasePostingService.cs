@@ -1,3 +1,4 @@
+using Catalog = Daftar.Domain.Catalog;
 using Daftar.Domain.Inventory;
 using Daftar.Domain.Purchasing;
 using Daftar.Domain.Shared;
@@ -30,17 +31,17 @@ public sealed class PurchasePostingService(DaftarContext context)
         DateOnly? businessDate = null,
         CancellationToken cancellationToken = default)
     {
-        await using IDbContextTransaction tx = await TransactionScope.BeginAsync(context, cancellationToken);
+        await using TransactionScope tx = await TransactionScope.BeginAsync(context, cancellationToken);
 
         try
         {
             var result = await PostCoreAsync(purchaseId, userId, businessDate, cancellationToken);
-            await TransactionScope.CommitAsync(tx, context, cancellationToken);
+            await tx.CommitAsync(cancellationToken);
             return result;
         }
         catch
         {
-            await TransactionScope.RollbackAsync(tx, context, cancellationToken);
+            await tx.RollbackAsync(cancellationToken);
             throw;
         }
     }
@@ -75,7 +76,34 @@ public sealed class PurchasePostingService(DaftarContext context)
                 .FirstOrDefaultAsync(p => p.Id == item.ProductId, cancellationToken)
                 ?? throw new DomainException($"Product {item.ProductId} does not exist.");
 
-            var lot = Lot.Create(
+            Lot lot;
+
+            if (purchase.Type == PurchaseType.Return)
+            {
+                // Goods going back to the supplier leave the warehouse. They must be drawn from
+                // the batch they came in, or the same stock exists twice: once as the original
+                // lot (unchanged) and once as the new lot this would have created.
+                lot = await DrawFromOriginalLotAsync(item, product, date, userId, cancellationToken)
+                      ?? throw new DomainException(
+                          $"سطر الإرجاع {item.LineNo} لازم يحدد الدفعة الأصلية اللي بترجّع منها.");
+
+                ApplyMovement(
+                    lot: lot,
+                    locationId: purchase.LocationId,
+                    kind: InventoryMovementKind.PurchaseReturn,
+                    magnitude: item.BaseQuantity,
+                    sourceType: MovementSourceType.Purchase,
+                    sourceId: purchase.Id,
+                    userId: userId,
+                    businessDate: date,
+                    nowUtc: now);
+
+                lotIds.Add(lot.Id);
+                item.LotId = lot.Id;
+                continue;
+            }
+
+            lot = Lot.Create(
                 productId: product.Id,
                 receivedOn: date,
                 supplierId: purchase.SupplierId,
@@ -94,9 +122,7 @@ public sealed class PurchasePostingService(DaftarContext context)
             ApplyMovement(
                 lot: lot,
                 locationId: purchase.LocationId,
-                kind: purchase.Type == PurchaseType.Return
-                    ? InventoryMovementKind.PurchaseReturn
-                    : InventoryMovementKind.Receipt,
+                kind: InventoryMovementKind.Receipt,
                 magnitude: item.BaseQuantity,
                 sourceType: MovementSourceType.Purchase,
                 sourceId: purchase.Id,
@@ -157,6 +183,38 @@ public sealed class PurchasePostingService(DaftarContext context)
     /// Stages a movement and moves the balance. The caller saves, so the row and the balance change
     /// always land together. A transfer calls this twice with opposite signs.
     /// </summary>
+    /// <summary>
+    /// Resolves the batch a supplier return draws from, and confirms that batch still holds the
+    /// quantity being sent back.
+    /// </summary>
+    /// <remarks>
+    /// The return line names the original batch in <see cref="PurchaseItem.LotId"/>. Looking that
+    /// batch up here — rather than creating a new one — is what stops the same goods from being
+    /// counted twice: the original balance is what goes down, and nothing else appears.
+    /// </remarks>
+    private async Task<Lot?> DrawFromOriginalLotAsync(
+        PurchaseItem item,
+        Catalog.Product product,
+        DateOnly date,
+        int userId,
+        CancellationToken cancellationToken)
+    {
+        if (item.LotId is not { } lotId)
+            return null;
+
+        var lot = await context.Lots
+            .FirstOrDefaultAsync(l => l.Id == lotId, cancellationToken);
+
+        if (lot is null)
+            return null;
+
+        if (lot.ProductId != product.Id)
+            throw new DomainException(
+                $"سطر الإرجاع {item.LineNo}: الدفعة {lotId} بتاعة صنف تاني.");
+
+        return lot;
+    }
+
     public void ApplyMovement(
         Lot lot,
         int locationId,

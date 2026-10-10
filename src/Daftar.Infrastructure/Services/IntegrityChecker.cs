@@ -7,14 +7,32 @@ public sealed record IntegrityProblem(string Check, string Detail);
 
 public sealed record IntegrityReport(
     int ChecksRun,
-    IReadOnlyList<IntegrityProblem> Problems)
+    IReadOnlyList<IntegrityProblem> Problems,
+    bool Completed = true)
 {
-    public bool IsClean => Problems.Count == 0;
+    /// <summary>
+    /// True when the checks finished and found nothing. False when the checker itself could not
+    /// run, so "unverified" is never mistaken for "verified and fine".
+    /// </summary>
+    public bool IsClean => Completed && Problems.Count == 0;
 
-    public override string ToString() => IsClean
-        ? $"OK — {ChecksRun} checks, no problems."
-        : $"FAILED — {Problems.Count} problem(s) in {ChecksRun} checks:\n"
-          + string.Join("\n", Problems.Select(p => $"  [{p.Check}] {p.Detail}"));
+    /// <summary>The scan threw or ran out of memory; nothing was verified either way.</summary>
+    public static IntegrityReport Skipped() => new(0, Array.Empty<IntegrityProblem>(), Completed: false);
+
+    /// <summary>Startup could not get the database into a usable state.</summary>
+    public static IntegrityReport Failed(string check, string detail)
+        => new(0, [new IntegrityProblem(check, detail)], Completed: false);
+
+    public override string ToString()
+    {
+        if (Problems.Count > 0)
+            return $"FAILED — {Problems.Count} problem(s):\n"
+                 + string.Join("\n", Problems.Select(p => $"  [{p.Check}] {p.Detail}"));
+
+        return !Completed
+            ? "SKIPPED — the integrity check did not run; the ledger is unverified."
+            : $"OK — {ChecksRun} checks, no problems.";
+    }
 }
 
 /// <summary>

@@ -323,6 +323,12 @@ public partial class SellViewModel : ObservableObject
         var unit = product.SelectedUnit;
         if (unit is null) return;
 
+        if (!unit.IsPriced)
+        {
+            Status = $"'{product.Name} - {unit.UnitName}' مالوش سعر بيع. ظبّط قائمة الأسعار الأول.";
+            return;
+        }
+
         if (_cartByUnitId.TryGetValue(unit.ProductUnitId, out var existing))
         {
             if (existing.Quantity < unit.OnHand)
@@ -892,6 +898,12 @@ public partial class SellViewModel : ObservableObject
             using var scope = _services.CreateScope();
             var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
 
+            // One transaction for the header, the lines, the posting and the voucher. The posting
+            // service used to commit on its own, so a failure between the sale and its payment
+            // left a posted sale with a full receivable and nothing in the till.
+            await using TransactionScope tx = await TransactionScope.BeginAsync(ctx, default);
+            try
+            {
             var today = DateOnly.FromDateTime(DateTime.Now);
             var listId = await DefaultPriceListAsync(ctx);
 
@@ -921,6 +933,13 @@ public partial class SellViewModel : ObservableObject
 
             foreach (var line in Cart)
             {
+                // Last line of defence: a line priced at zero would post as a real sale worth
+                // nothing. The cart already refuses unpriced units, so reaching here means the
+                // price was changed underneath us — refuse rather than give the goods away.
+                if (line.UnitPrice <= 0m)
+                    throw new DomainException(
+                        $"'{line.Name}' سعره صفر — اتأكد من قائمة الأسعار قبل الحفظ.");
+
                 sale.AddItem(productsById[line.ProductId], unitsById[line.ProductUnitId],
                     line.Quantity, line.UnitPrice, line.UnitPrice, discountAmount: line.Discount);
             }
@@ -933,7 +952,7 @@ public partial class SellViewModel : ObservableObject
             // The sale always makes the customer owe us; the voucher is what reduces that.
             var result = await new SalePostingService(ctx).PostAsync(sale.Id, userId: 1, today);
 
-            await Settlement.ApplyAsync(
+            var settled = await Settlement.TryApplyAsync(
                 ctx,
                 PaymentDirection.In,
                 sale.PartyId,
@@ -942,6 +961,18 @@ public partial class SellViewModel : ObservableObject
                 total: sale.Total,
                 today,
                 userId: 1);
+
+            if (!settled && Settlement.Settlement != SettlementChoice.Deferred)
+            {
+                // The cashier chose to settle but no voucher could be written. Rolling back keeps
+                // the receipt and the cash in agreement; reporting success here would post the
+                // invoice while the money went nowhere.
+                await tx.RollbackAsync(default);
+                Status = $"لم يتم حفظ الفاتورة: {Settlement.Problem}";
+                return;
+            }
+
+            await tx.CommitAsync(default);
 
             Status = $"تم حفظ {result.DocNo} — الإجمالي {DashboardViewModel.Money(sale.Total)}";
             Cart.Clear();
@@ -953,6 +984,12 @@ public partial class SellViewModel : ObservableObject
             Recalculate();
             await LoadAsync();
             SelectedCustomer = Customers.FirstOrDefault(c => c.Name.Contains("نقدي")) ?? Customers.FirstOrDefault();
+            }
+            catch
+            {
+                await tx.RollbackAsync(default);
+                throw;
+            }
         }
         catch (Exception ex)
         {
@@ -1076,6 +1113,13 @@ public sealed record CartUnitOption(
     decimal PurchasePrice,
     decimal OnHand)
 {
+    /// <summary>
+    /// False when no price could be resolved for this unit. A zero price used to mean "free",
+    /// which let a genuinely missing price list entry post a real sale at zero revenue. Such a
+    /// unit is shown but cannot be added to the cart.
+    /// </summary>
+    public bool IsPriced => Price > 0m;
+
     public override string ToString() => UnitName;
 }
 

@@ -51,9 +51,11 @@ public sealed class ProductUnitConfig : IEntityTypeConfiguration<ProductUnit>
         b.HasIndex(u => u.Barcode).IsUnique().HasFilter("\"Barcode\" IS NOT NULL");
         b.HasIndex(u => new { u.ProductId, u.Name }).IsUnique();
 
-        // Exactly one base unit per product. A partial index: EF cannot express this with
-        // HasIndex/HasFilter reliably across providers, so the migration adds it with raw SQL.
-        b.HasIndex(u => u.ProductId).HasFilter("IsBase = 1");
+        // Exactly one base unit per product. This has to be unique in the model, not only in the
+        // migration that happened to create it: a HasIndex without IsUnique makes the next
+        // `dotnet ef migrations add` emit a DropIndex, and the next two base units per product
+        // silently diverge in UnitFactor — which changes BaseQuantity = Quantity x Factor.
+        b.HasIndex(u => u.ProductId).IsUnique().HasFilter("IsBase = 1");
 
         b.HasOne(u => u.Product)
             .WithMany(p => p.Units)

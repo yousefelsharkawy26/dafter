@@ -92,11 +92,17 @@ public sealed class InventoryMovement : IAppendOnly, IDomainValidatable
 
     public bool IsInbound => Quantity > 0m;
 
-    /// <summary>Kinds that add stock. Reversal takes the sign of the row it reverses, so it is either.</summary>
+    /// <summary>
+    /// Kinds that add stock. Reversal takes the sign of the row it reverses, so it is either.
+    /// </summary>
+    /// <remarks>
+    /// PurchaseReturn is deliberately absent: goods handed back to a supplier leave the warehouse,
+    /// exactly like a sale does. Listing it here made a supplier return *increase* stock and mint
+    /// a second batch for the same goods.
+    /// </remarks>
     public static bool IsInboundKind(InventoryMovementKind kind) => kind
         is InventoryMovementKind.Opening
         or InventoryMovementKind.Receipt
-        or InventoryMovementKind.PurchaseReturn
         or InventoryMovementKind.SaleReturn
         or InventoryMovementKind.TransferIn;
 
@@ -125,9 +131,10 @@ public sealed class InventoryMovement : IAppendOnly, IDomainValidatable
         => kind switch
         {
             InventoryMovementKind.Opening or InventoryMovementKind.Receipt
-                or InventoryMovementKind.PurchaseReturn or InventoryMovementKind.SaleReturn
+                or InventoryMovementKind.SaleReturn
                 or InventoryMovementKind.TransferIn => quantity > 0m,
-            InventoryMovementKind.Sale or InventoryMovementKind.TransferOut
+            InventoryMovementKind.Sale or InventoryMovementKind.PurchaseReturn
+                or InventoryMovementKind.TransferOut
                 or InventoryMovementKind.Scrap => quantity < 0m,
             // CountAdjust, Adjust and Reversal may go either way.
             _ => true,

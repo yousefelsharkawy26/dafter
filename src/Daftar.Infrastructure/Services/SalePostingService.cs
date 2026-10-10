@@ -28,16 +28,16 @@ public sealed class SalePostingService(DaftarContext context)
         DateOnly? businessDate = null,
         CancellationToken cancellationToken = default)
     {
-        await using var tx = await context.Database.BeginTransactionAsync(cancellationToken);
+        await using TransactionScope tx = await TransactionScope.BeginAsync(context, cancellationToken);
         try
         {
             var result = await PostCoreAsync(saleId, userId, businessDate, cancellationToken);
-            await TransactionScope.CommitAsync(tx, context, cancellationToken);
+            await tx.CommitAsync(cancellationToken);
             return result;
         }
         catch
         {
-            await TransactionScope.RollbackAsync(tx, context, cancellationToken);
+            await tx.RollbackAsync(cancellationToken);
             throw;
         }
     }

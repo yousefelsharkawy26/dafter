@@ -46,7 +46,11 @@ public sealed class PurchaseItem : IDomainValidatable
         private set => _lineTotal = value;
     }
 
-    /// <summary>On an Invoice, the batch created at posting. On a Return, the batch being returned.</summary>
+    /// <summary>
+    /// On an Invoice this is filled in at posting: the batch the delivery created.
+    /// On a Return it must already name the batch the goods go back out of — a return that
+    /// mints a fresh batch would leave the original one untouched and count the same goods twice.
+    /// </summary>
     public int? LotId { get; set; }
     public Inventory.Lot? Lot { get; set; }
 
