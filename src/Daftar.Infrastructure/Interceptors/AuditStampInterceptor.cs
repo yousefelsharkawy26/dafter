@@ -142,15 +142,35 @@ public sealed class AuditStampInterceptor(ICurrentUser currentUser) : SaveChange
         return string.Join("|", parts);
     }
 
+    /// <summary>
+    /// Properties that must never be copied into the audit trail.
+    ///
+    /// AuditLogs is append-only at the database level, so anything written there is permanent and
+    /// cannot be purged by changing the password it duplicates. A password hash written here is a
+    /// second, permanent copy of credential material in a table that exports and backups expose
+    /// far more freely than Users does.
+    /// </summary>
+    /// <remarks>
+    /// This is a deny-list, which fails open for any column added later. That is the safer failure
+    /// direction for the audit columns themselves, but the opposite for secrets, so any new
+    /// sensitive column must be added here deliberately.
+    /// </remarks>
+    private static readonly HashSet<string> NeverAudit =
+    [
+        nameof(User.PasswordHash),
+    ];
+
     private static string? SerializeChangedProperties(EntityEntry entry)
     {
         var changed = entry.Properties
             .Where(p => p.IsModified || entry.State == EntityState.Added)
             .Where(p => !string.Equals(p.Metadata.Name, nameof(IAuditable.UpdatedAt), StringComparison.Ordinal)
                      && !string.Equals(p.Metadata.Name, nameof(IAuditable.UpdatedBy), StringComparison.Ordinal))
-            .ToDictionary(
-                p => p.Metadata.Name,
-                p => p.CurrentValue?.ToString() ?? "null");
+            // Record that the credential changed, not what it became.
+            .Select(p => NeverAudit.Contains(p.Metadata.Name)
+                ? new KeyValuePair<string, string>(p.Metadata.Name, "(redacted)")
+                : new KeyValuePair<string, string>(p.Metadata.Name, p.CurrentValue?.ToString() ?? "null"))
+            .ToDictionary(p => p.Key, p => p.Value);
 
         return changed.Count == 0
             ? null

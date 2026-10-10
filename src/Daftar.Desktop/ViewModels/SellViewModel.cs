@@ -82,6 +82,14 @@ public partial class SellViewModel : ObservableObject
         using var scope = _services.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
 
+        // The role's discount ceiling, read once per load. Role.MaxDiscountPercent was validated
+        // on write and displayed in settings, but never consulted during a sale -- so a cashier
+        // capped at 0% could still discount every line to cost.
+        MaxAllowedDiscountPercent = await scope.ServiceProvider
+            .GetRequiredService<IUserAuthorizer>()
+            .MaxDiscountPercentAsync();
+        OnPropertyChanged(nameof(LineDiscountRuleHint));
+
         Customers.Clear();
         var parties = await ctx.Parties
                      .AsNoTracking()
@@ -483,6 +491,19 @@ public partial class SellViewModel : ObservableObject
             return;
         }
 
+        // The role's ceiling, not just the cost floor. MaxDiscountPercent was validated on write
+        // and shown in settings but never read here, so any discount up to cost was allowed to
+        // anyone regardless of what their role permitted.
+        if (MaxAllowedDiscountPercent is { } cap)
+        {
+            var ceiling = MaxDiscountCeilingFor(SelectedCartLine.UnitPrice, cap);
+            if (LineDiscountInput > ceiling)
+            {
+                LineDiscountError = $"خصمك ({LineDiscountInput:N2} ج.م) أكبر من الحد المسموح لدورك ({ceiling:N2} ج.م، {cap:N0}%).";
+                return;
+            }
+        }
+
         if (SelectedCartLine.UnitPrice - LineDiscountInput < SelectedCartLine.PurchasePrice)
         {
             LineDiscountError = $"سعر البيع بعد الخصم لا يمكن أن يقل عن سعر شراء المنتج ({SelectedCartLine.PurchasePrice:N2} ج.م).";
@@ -495,9 +516,19 @@ public partial class SellViewModel : ObservableObject
         SelectedCartLine = null;
     }
 
-    public string LineDiscountRuleHint => SelectedCartLine is not null
-        ? $"أقصى خصم مسموح به للوحدة: {SelectedCartLine.PurchasePrice:N2} ج.م (سعر الشراء: {SelectedCartLine.PurchasePrice:N2} ج.م)"
-        : string.Empty;
+    public string LineDiscountRuleHint => SelectedCartLine is null
+        ? string.Empty
+        : MaxAllowedDiscountPercent is { } cap
+            ? $"أقصى خصم للوحدة: {Math.Min(SelectedCartLine.PurchasePrice, MaxDiscountCeilingFor(SelectedCartLine.UnitPrice, cap)):N2} ج.م"
+            : $"أقصى خصم مسموح به للوحدة: {SelectedCartLine.PurchasePrice:N2} ج.م (سعر الشراء: {SelectedCartLine.PurchasePrice:N2} ج.م)";
+
+    /// <summary>
+    /// The signed-in role's discount ceiling as a percentage, or null when the role sets none.
+    /// </summary>
+    public decimal? MaxAllowedDiscountPercent { get; private set; }
+
+    private static decimal MaxDiscountCeilingFor(decimal unitPrice, decimal percent)
+        => unitPrice * percent / 100m;
 
     [ObservableProperty] private string _paymentMode = "Cash";
     [ObservableProperty] private bool _isPaymentOtherExpanded;

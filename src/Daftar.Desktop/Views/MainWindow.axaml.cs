@@ -1,5 +1,6 @@
 using System;
 using Avalonia.Controls;
+using Daftar.Infrastructure;
 using Daftar.ViewModels;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +40,11 @@ public partial class MainWindow : Window
     {
         if (App.Services is { } services)
         {
+            // Clear the identity first. Everything written between sign-out and the next sign-in
+            // used to be stamped with the previous user's id, which is precisely the window where
+            // the audit trail is relied on.
+            services.GetRequiredService<ICurrentUser>().SignOut();
+
             var loginVm = services.GetRequiredService<LoginViewModel>();
             var loginWin = new LoginWindow(loginVm);
             loginWin.Show();

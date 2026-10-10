@@ -416,6 +416,17 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
             using var scope = _services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<DaftarContext>();
 
+            // Anyone who can reach this screen could mint an administrator: assign the Admin role,
+            // set a password they know, sign in as it. Without this check the whole role model is
+            // decorative -- User.Can was defined and never called, and every page was registered
+            // unconditionally.
+            var authorizer = scope.ServiceProvider.GetRequiredService<IUserAuthorizer>();
+            if (!await authorizer.CanAsync(Role.Codes.UsersManage))
+            {
+                UserDialogError = "ليست عندك صلاحية لإدارة المستخدمين.";
+                return;
+            }
+
             // Check username uniqueness
             var currentId = EditingUserId ?? 0;
             var exists = await db.Users.AnyAsync(u => u.Username.ToLower() == username.ToLower() && u.Id != currentId);

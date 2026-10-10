@@ -173,8 +173,9 @@ public partial class LoginViewModel(IServiceProvider services) : ObservableObjec
             });
             await audit.SaveChangesAsync();
 
-            if (_services.GetService(typeof(ICurrentUser)) is CurrentUser current)
-                current.UserId = user.Id;
+            // Only after the credentials check out and before anything else stamps work. Set
+            // here rather than earlier so a rejected sign-in leaves no identity behind.
+            (_services.GetService(typeof(ICurrentUser)) as CurrentUser)?.SignIn(user.Id);
 
             SignedInUser = user;
             Role = user.Role;

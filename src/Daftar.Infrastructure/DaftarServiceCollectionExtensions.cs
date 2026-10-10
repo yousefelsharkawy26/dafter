@@ -14,6 +14,7 @@ public static class DaftarServiceCollectionExtensions
         string databasePath)
     {
         services.AddSingleton<ICurrentUser, CurrentUser>();
+        services.AddScoped<IUserAuthorizer, UserAuthorizer>();
         services.AddScoped<AuditStampInterceptor>();
 
         services.AddDbContext<DaftarContext>((provider, options) =>
