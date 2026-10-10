@@ -50,6 +50,11 @@ sealed class Program
 
         try
         {
+            // Before the container exists, so no connection is open when the file is swapped.
+            var restore = BackupStore.ForApp.ApplyPendingRestore();
+            if (restore.Restored)
+                StartupError.Show("تمت استعادة نسخة احتياطية", restore.Message);
+
             services = Bootstrap.BuildServiceProvider();
             var report = Bootstrap.InitializeDatabase(services);
 
@@ -77,8 +82,9 @@ sealed class Program
                 "دفتر مقدرش يشتغل",
                 "حصل خطأ أثناء فتح قاعدة البيانات، والتطبيق اتقفل." + Environment.NewLine +
                 Environment.NewLine +
-                "ما تحذفش أي ملف من مجلد البيانات. لو المشكلة فضلت، شغّل النسخة الاحتياطية" +
-                " الموجودة في مجلد Backups." + Environment.NewLine + Environment.NewLine +
+                "ما تحذفش أي ملف من مجلد البيانات." + Environment.NewLine +
+                "لو البيانات ناقصة أو ناقصة، افتح دفتر تاني وروح لصفحة الإعدادات، قسم النسخ الاحتياطي،" +
+                " واختار ترجع نسخة سابقة." + Environment.NewLine + Environment.NewLine +
                 ex.Message);
 
             return 1;

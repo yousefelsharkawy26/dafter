@@ -78,16 +78,10 @@ public static class Bootstrap
         string destination,
         CancellationToken ct)
     {
-        Directory.CreateDirectory(DaftarPaths.BackupDirectory);
-
         using var backupScope = services.CreateScope();
         var db = backupScope.ServiceProvider.GetRequiredService<DaftarContext>();
 
-        // VACUUM INTO needs a literal path in SQLite, so it cannot be parameterised. The path is
-        // built from the app data directory and a timestamp — no user input reaches it — and the
-        // quote is doubled for safety.
-        var escaped = destination.Replace("'", "''");
-        await db.Database.ExecuteSqlRawAsync($"VACUUM INTO '{escaped}';", ct);
-        return File.Exists(destination);
+        var file = await BackupStore.ForApp.CreateAtAsync(db, destination, ct);
+        return File.Exists(file.Path);
     }
 }

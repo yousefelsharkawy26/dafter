@@ -77,6 +77,9 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         OnPropertyChanged(nameof(IsUsersSectionActive));
         OnPropertyChanged(nameof(IsRolesSectionActive));
         OnPropertyChanged(nameof(IsBackupSectionActive));
+
+        if (value == 3)
+            RefreshBackups();
     }
 
     // ── Company Settings ──────────────────────────────────────────────────────
@@ -276,6 +279,42 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
     }
 
     // ── Backup Actions ────────────────────────────────────────────────────────
+
+    /// <summary>Snapshots on disk, newest first. Rebuilt whenever the backup section opens.</summary>
+    public ObservableCollection<BackupFile> Backups { get; } = [];
+
+    /// <summary>The snapshot queued for the next start, if any.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPendingRestore))]
+    private BackupFile? _pendingRestore;
+
+    public bool HasPendingRestore => PendingRestore is not null;
+
+    public bool HasNoBackups => Backups.Count == 0;
+
+    private BackupStore Store => BackupStore.ForApp;
+
+    /// <summary>
+    /// Re-reads the folder. Called when the section opens so the list is current without a
+    /// manual refresh button the user has to know about.
+    /// </summary>
+    [RelayCommand]
+    public void RefreshBackups()
+    {
+        var store = Store;
+
+        Backups.Clear();
+        foreach (var file in store.List())
+            Backups.Add(file);
+
+        OnPropertyChanged(nameof(HasNoBackups));
+
+        var pendingPath = store.PendingRestore();
+        PendingRestore = pendingPath is null
+            ? null
+            : Backups.FirstOrDefault(b => b.Path == pendingPath);
+    }
+
     [RelayCommand]
     public async Task CreateBackupAsync()
     {
@@ -284,28 +323,25 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         try
         {
             await Task.Yield();
-            var dbPath = DaftarPaths.DatabasePath;
-            if (!System.IO.File.Exists(dbPath))
+
+            if (!System.IO.File.Exists(DaftarPaths.DatabasePath))
             {
                 BackupStatusMessage = "ملف قاعدة البيانات غير موجود بعد.";
                 return;
             }
 
-            var backupDir = System.IO.Path.Combine(DaftarPaths.AppDataDirectory, "Backups");
-            System.IO.Directory.CreateDirectory(backupDir);
-
-            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var backupFileName = $"daftar_backup_{timestamp}.db";
-            var destPath = System.IO.Path.Combine(backupDir, backupFileName);
-
             using var scope = _services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<DaftarContext>();
 
-            var sql = "VACUUM INTO '" + destPath.Replace("'", "''") + "';";
-            await db.Database.ExecuteSqlRawAsync(sql);
+            var created = await Store.CreateAsync(db);
+            var pruned = Store.Prune();
 
-            LastBackupPath = destPath;
-            BackupStatusMessage = $"تم حفظ النسخة الاحتياطية بنجاح ✓ ({backupFileName})";
+            LastBackupPath = created.Path;
+            RefreshBackups();
+
+            BackupStatusMessage = pruned > 0
+                ? $"تم حفظ النسخة الاحتياطية بنجاح ✓، وتم مسح {pruned} نسخة قديمة."
+                : "تم حفظ النسخة الاحتياطية بنجاح ✓";
         }
         catch (Exception ex)
         {
@@ -315,6 +351,42 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         {
             IsBackupBusy = false;
         }
+    }
+
+    /// <summary>
+    /// Queues a snapshot. It cannot be applied here — the database file is open behind this
+    /// screen — so the operator is told plainly what to do next instead of being left waiting.
+    /// </summary>
+    [RelayCommand]
+    public void ScheduleRestore(BackupFile? file)
+    {
+        if (file is null)
+        {
+            BackupStatusMessage = "اختار نسخة أول.";
+            return;
+        }
+
+        try
+        {
+            Store.ScheduleRestore(file.Path);
+            RefreshBackups();
+
+            BackupStatusMessage =
+                "الاستعادة اتجدولت. اقفل دفتر وافتحه تاني، وهترجع البيانات للحالة دي.";
+        }
+        catch (Exception ex)
+        {
+            BackupStatusMessage = $"مقدرتش أجدول الاستعادة: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public void CancelRestore()
+    {
+        Store.CancelPendingRestore();
+        RefreshBackups();
+
+        BackupStatusMessage = "الاستعادة اتلغت.";
     }
 
     // ── User Management Actions ───────────────────────────────────────────────

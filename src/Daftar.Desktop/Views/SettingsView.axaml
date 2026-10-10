@@ -271,6 +271,49 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+
+                    <Border Classes="panel" Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Classes="heading" Text="النسخ الموجودة" />
+
+                            <TextBlock Classes="muted" TextWrapping="Wrap"
+                                       Text="ترجع أي نسخة من دول؟ لازم تقفل دفتر بعد ما تختار، وتفتحه تاني عشان الاستعادة تنفع." />
+
+                            <Border Background="#FFF4E5" CornerRadius="6" Padding="12"
+                                    IsVisible="{Binding HasPendingRestore}">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="⏳" VerticalAlignment="Center" />
+                                    <TextBlock VerticalAlignment="Center" TextWrapping="Wrap"
+                                               Text="{Binding PendingRestore.Name, StringFormat='الاستعادة متجدولة للنسخة {0}. اقفل دفتر وافتحه تاني.'}" />
+                                    <Button Command="{Binding CancelRestoreCommand}" Content="إلغاء" />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Classes="muted" Text="مفيش نسخ محفوظة لحد دلوقتي."
+                                       IsVisible="{Binding HasNoBackups}" />
+
+                            <ItemsControl ItemsSource="{Binding Backups}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#1A1A1A" CornerRadius="6" Padding="12" Margin="0,0,0,6">
+                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding CreatedDisplay}" FontWeight="Bold" />
+                                                    <TextBlock Text="{Binding SizeDisplay}" Classes="caption muted" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1" VerticalAlignment="Center" Classes="caption muted"
+                                                           Text="{Binding Name}" />
+                                                <Button Grid.Column="2" VerticalAlignment="Center"
+                                                        Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).ScheduleRestoreCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="استعادة" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
 

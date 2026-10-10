@@ -20,6 +20,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Test classes run one at a time. The fixture disposes with SqliteConnection.ClearAllPools(),
+         which is process-wide: with collections in parallel, one class's teardown pulls the
+         connection pool out from under another class that is still querying, and the failure lands
+         on whichever test happened to be running rather than on the cause. -->
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Daftar.Domain\Daftar.Domain.csproj" />
     <ProjectReference Include="..\..\src\Daftar.Infrastructure\Daftar.Infrastructure.csproj" />
     <!-- The screen view models are plain objects over the same services, so they are tested
