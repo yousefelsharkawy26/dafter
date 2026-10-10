@@ -42,14 +42,18 @@ public partial class LoginWindow : Window
         if (_viewModel is null || e.PropertyName != nameof(LoginViewModel.Succeeded) || !_viewModel.Succeeded)
             return;
 
-        var shell = new MainWindow
+        var shellVm = new MainWindowViewModel
         {
-            DataContext = new MainWindowViewModel
-            {
-                Services = App.Services,
-                CurrentUserName = _viewModel.SignedInUser?.FullName ?? _viewModel.Username,
-            },
+            Services = App.Services,
+            CurrentUserName = _viewModel.SignedInUser?.FullName ?? _viewModel.Username,
         };
+
+        // Narrow the launcher to the pages this role can open, before the window is shown, so
+        // the operator never sees a screen flash in and vanish. Two indexed reads; the UI thread
+        // is still free at this point because no window exists yet.
+        shellVm.ApplyPermissionsAsync().GetAwaiter().GetResult();
+
+        var shell = new MainWindow { DataContext = shellVm };
 
         shell.Show();
         Close();

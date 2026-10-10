@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Daftar.Views;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Daftar.ViewModels;
 
@@ -33,6 +34,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         Tabs = [];
+        _services = App.Services;
 
         _pages = new Dictionary<string, TabSpec>
         {
@@ -83,12 +85,60 @@ public partial class MainWindowViewModel : ObservableObject
         _isStartMenuOpen = true;
     }
 
+    /// <summary>
+    /// The permission a page needs before it is offered. Null means everyone may open it.
+    /// </summary>
+    /// <remarks>
+    /// This hides the page, it does not protect it: the enforcement that matters is in
+    /// SaveChanges and the posting services. Hiding it means a cashier is not offered a screen
+    /// whose every action would be refused, which is a worse experience than a visible screen that
+    /// explains the limit.
+    /// </remarks>
+    private static readonly Dictionary<string, string> PagePermissions = new(StringComparer.Ordinal)
+    {
+        [TabKeys.Settings] = Domain.Security.Role.Codes.UsersManage,
+        [TabKeys.Products] = Domain.Security.Role.Codes.PriceOverride,
+    };
+
+    /// <summary>
+    /// Whether the signed-in role may open a page. Falls back to allowing it when the identity
+    /// cannot be resolved, so a permission problem never locks the operator out of the till.
+    /// </summary>
+    private async Task<bool> CanOpenPageAsync(string key)
+    {
+        if (!PagePermissions.TryGetValue(key, out var code))
+            return true;
+
+        if (_services is null)
+            return true;
+
+        using var scope = _services.CreateScope();
+        var authorizer = scope.ServiceProvider.GetService<Daftar.Infrastructure.IUserAuthorizer>();
+        if (authorizer is null)
+            return true;
+
+        return await authorizer.CanAsync(code);
+    }
+
+    /// <summary>Applies the role filter to the launcher strip.</summary>
+    public async Task ApplyPermissionsAsync()
+    {
+        var allowed = new List<string>();
+
+        foreach (var key in TabKeys.Order.Where(_pages.ContainsKey))
+            if (await CanOpenPageAsync(key))
+                allowed.Add(key);
+
+        Launcher = allowed.Select(key => new LauncherButton(key, TabKeys.TitleFor(key))).ToList();
+        OnPropertyChanged(nameof(Launcher));
+    }
+
     private static TabSpec Placeholder(string key, string caption)
         => new(key, TabKeys.TitleFor(key), null, null, caption);
 
     public ObservableCollection<TabViewModel> Tabs { get; }
 
-    public IReadOnlyList<LauncherButton> Launcher { get; }
+    public IReadOnlyList<LauncherButton> Launcher { get; private set; }
 
     public bool HasOpenTabs => Tabs.Count > 0;
 
@@ -181,6 +231,15 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (key is null || !_pages.TryGetValue(key, out var spec))
             return;
+
+        // The launcher already omits pages the role cannot open, so reaching this with a hidden key
+        // means a keyboard shortcut or a stale tab. Refuse rather than render a screen whose every
+        // action would be rejected at save time.
+        if (!Launcher.Any(b => b.Key == key))
+        {
+            StatusText = "ماعندكش صلاحية تفتح الصفحة دي.";
+            return;
+        }
 
         IsStartMenuOpen = false;
 

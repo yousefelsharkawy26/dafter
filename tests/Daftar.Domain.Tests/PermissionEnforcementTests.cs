@@ -216,6 +216,175 @@ public sealed class PermissionEnforcementTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task Saving_A_User_Is_Refused_Without_The_Permission()
+    {
+        // The enforcement point. Every write in the application passes through SaveChanges, so a
+        // screen added later that creates users cannot bypass this by forgetting to call
+        // something first -- a check in a ViewModel only disables a button.
+        var cashierId = await CreateUserAsync("saveclerk", Role.Codes.SalesCreate);
+
+        int adminRoleId;
+        using (var setup = _services.CreateScope())
+        {
+            var setupCtx = setup.ServiceProvider.GetRequiredService<DaftarContext>();
+            adminRoleId = (await setupCtx.Roles.ToListAsync()).First(r => r.Permissions.Contains("Users.Manage")).Id;
+        }
+
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(cashierId);
+        try
+        {
+            using var scope = _services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+
+            ctx.Users.Add(new User
+            {
+                Username = "backdoor",
+                FullName = "مدخل خلفي",
+                PasswordHash = PasswordHasher.Hash("pw"),
+                RoleId = adminRoleId,
+                IsActive = true,
+            });
+
+            var ex = await Assert.ThrowsAsync<Domain.Shared.DomainException>(() => ctx.SaveChangesAsync());
+            Assert.Contains(Role.Codes.UsersManage, ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+
+        using var verify = _services.CreateScope();
+        Assert.False(await verify.ServiceProvider.GetRequiredService<DaftarContext>()
+            .Users.AnyAsync(u => u.Username == "backdoor"));
+    }
+
+    [Fact]
+    public async Task Saving_A_User_Is_Allowed_With_The_Permission()
+    {
+        var adminId = await CreateUserAsync("realadmin", Role.Codes.UsersManage);
+
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(adminId);
+        try
+        {
+            using var scope = _services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+            var role = await ctx.Roles.FirstAsync();
+
+            ctx.Users.Add(new User
+            {
+                Username = "hired",
+                FullName = "موظف جديد",
+                PasswordHash = PasswordHasher.Hash("pw"),
+                RoleId = role.Id,
+                IsActive = true,
+            });
+            await ctx.SaveChangesAsync();
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+
+        using var verify = _services.CreateScope();
+        Assert.True(await verify.ServiceProvider.GetRequiredService<DaftarContext>()
+            .Users.AnyAsync(u => u.Username == "hired"));
+    }
+
+    [Fact]
+    public async Task Editing_A_Role_Is_Refused_Without_The_Permission()
+    {
+        // Otherwise a cashier grants themselves Users.Manage by editing the role they already hold.
+        var cashierId = await CreateUserAsync("roleclerk", Role.Codes.SalesCreate);
+
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(cashierId);
+        try
+        {
+            using var scope = _services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+            var role = await ctx.Roles.FirstAsync();
+
+            role.Permissions = Role.Codes.UsersManage;
+
+            await Assert.ThrowsAsync<Domain.Shared.DomainException>(() => ctx.SaveChangesAsync());
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+
+        using var verify = _services.CreateScope();
+        var verifyCtx = verify.ServiceProvider.GetRequiredService<DaftarContext>();
+
+        // The cashier's own role, not whichever role happens to be first in the table.
+        var clerkRoleId = (await verifyCtx.Users
+            .Where(u => u.Username == "roleclerk")
+            .Select(u => u.RoleId)
+            .FirstAsync());
+        var clerkRole = await verifyCtx.Roles.FindAsync(clerkRoleId);
+
+        Assert.DoesNotContain(Role.Codes.UsersManage, clerkRole!.Permissions, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Seeding_And_Startup_Are_Not_Blocked()
+    {
+        // Nobody is signed in while seeding and migrating, so the check must not fire there.
+        _services.GetRequiredService<ICurrentUser>().SignOut();
+
+        using var scope = _services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+
+        ctx.Roles.Add(new Role { Name = "seeded-while-unattended" });
+        await ctx.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task The_Launcher_Omits_Pages_The_Role_Cannot_Open()
+    {
+        // Hiding a page is not enforcement -- SaveChanges is -- but offering a cashier a screen
+        // whose every action is refused is a worse experience than not showing it at all.
+        var cashierId = await CreateUserAsync("launcherclerk", Role.Codes.SalesCreate);
+
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(cashierId);
+        try
+        {
+            var vm = new MainWindowViewModel { Services = _services };
+            await vm.ApplyPermissionsAsync();
+
+            Assert.DoesNotContain(vm.Launcher, b => b.Key == ViewModels.TabKeys.Settings);
+            Assert.DoesNotContain(vm.Launcher, b => b.Key == ViewModels.TabKeys.Products);
+
+            // The till itself is always reachable.
+            Assert.Contains(vm.Launcher, b => b.Key == ViewModels.TabKeys.Sell);
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+    }
+
+    [Fact]
+    public async Task An_Administrator_Sees_Every_Page()
+    {
+        var adminId = await CreateUserAsync("launcheradmin",
+            $"{Role.Codes.UsersManage},{Role.Codes.PriceOverride}");
+
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(adminId);
+        try
+        {
+            var vm = new MainWindowViewModel { Services = _services };
+            await vm.ApplyPermissionsAsync();
+
+            Assert.Contains(vm.Launcher, b => b.Key == ViewModels.TabKeys.Settings);
+            Assert.Contains(vm.Launcher, b => b.Key == ViewModels.TabKeys.Products);
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+    }
+
+    [Fact]
     public async Task Signing_Out_Clears_The_Identity()
     {
         var userId = await CreateUserAsync("leaver", Role.Codes.UsersManage);

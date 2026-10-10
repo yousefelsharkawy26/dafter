@@ -10,6 +10,18 @@ namespace Daftar.Infrastructure;
 
 public sealed class DaftarContext(DbContextOptions<DaftarContext> options) : DbContext(options)
 {
+    /// <summary>
+    /// Who is acting, for permission checks. Null during seeding, migrations and background work,
+    /// where no operator is signed in and nothing should be blocked.
+    /// </summary>
+    /// <remarks>
+    /// Read from the ambient identity rather than injected: EF creates contexts per scope and
+    /// there are dozens of construction sites, so threading the user through each one would be a
+    /// place to forget. CurrentUser uses AsyncLocal, so this reads the right value for the
+    /// operation in flight.
+    /// </remarks>
+    internal int? SignedInUserId => CurrentUserIdentity.Value?.UserId;
+
     // Security
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<User> Users => Set<User>();
@@ -93,5 +105,70 @@ public sealed class DaftarContext(DbContextOptions<DaftarContext> options) : DbC
             if (entry.State is EntityState.Added or EntityState.Modified)
                 entry.Entity.Validate();
         }
+
+        EnforcePermissions();
+    }
+
+    /// <summary>
+    /// The permission codes each protected entity requires to be written.
+    /// </summary>
+    /// <remarks>
+    /// Enforced here, in the one method every write passes through, rather than in each
+    /// ViewModel. A check in the UI stops a button; a check here stops the write. Adding a new
+    /// screen that creates a sale cannot forget this, because it does not know this exists.
+    /// </remarks>
+    private static readonly Dictionary<string, string> ProtectedWrites = new(StringComparer.Ordinal)
+    {
+        [nameof(User)] = Role.Codes.UsersManage,
+        [nameof(Role)] = Role.Codes.UsersManage,
+    };
+
+    /// <summary>
+    /// Refuses writes to permission-protected tables when the signed-in user lacks the code.
+    ///
+    /// Runs after the domain invariants so a genuine validation error still reads as one. Skipped
+    /// entirely when nobody is signed in: seeding, migrations and the startup integrity check all
+    /// write through here, and there is no operator to ask.
+    /// </summary>
+    private void EnforcePermissions()
+    {
+        if (SignedInUserId is not { } userId)
+            return;
+
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
+                continue;
+
+            if (!ProtectedWrites.TryGetValue(entry.Metadata.ClrType.Name, out var code))
+                continue;
+
+            if (!RoleGrants(userId, code))
+                throw new DomainException(
+                    $"ليست عندك صلاحية '{code}'. لو محتاج تعمل كده، كلّم مدير النظام.");
+        }
+    }
+
+    /// <summary>
+    /// Whether the signed-in user holds the code, read from the database rather than cached so
+    /// revoking a permission takes effect on the very next write.
+    /// </summary>
+    private bool RoleGrants(int userId, string code)
+    {
+        var permissions = Database.SqlQueryRaw<string>(
+                "SELECT r.Permissions FROM Users u JOIN Roles r ON r.Id = u.RoleId " +
+                "WHERE u.Id = {0} AND u.IsActive = 1",
+                userId)
+            .AsEnumerable()
+            .FirstOrDefault();
+
+        if (permissions is null)
+            return false;
+
+        // Same whole-token matching as Role.Has: the codes are comma separated, so padding with
+        // commas turns a LIKE into an exact match on the list.
+        var wanted = $",{code},";
+        var have = $",{permissions.Replace(" ", string.Empty)},";
+        return have.Contains(wanted, StringComparison.OrdinalIgnoreCase);
     }
 }

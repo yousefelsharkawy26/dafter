@@ -13,11 +13,39 @@ public interface ICurrentUser
     void SignOut();
 }
 
+/// <summary>
+/// The signed-in identity for the current logical operation.
+/// </summary>
+/// <remarks>
+/// A singleton with a plain field is wrong here: EF contexts are scoped and are created per
+/// operation, so any code that reaches the identity through a scope gets whatever value happened
+/// to be there. <see cref="AsyncLocal{T}"/> flows with the async call context instead, so a posting
+/// operation and the audit interceptor that stamps it always agree on who is acting, even when
+/// several operations are in flight.
+/// </remarks>
 public sealed class CurrentUser : ICurrentUser
 {
-    public int? UserId { get; private set; }
+    public int? UserId
+    {
+        get => CurrentUserIdentity.Value?.UserId;
+        set => CurrentUserIdentity.Value = value is { } id ? new CurrentUserState(id) : null;
+    }
 
     public void SignIn(int userId) => UserId = userId;
 
     public void SignOut() => UserId = null;
 }
+
+/// <summary>The signed-in id for the current async flow.</summary>
+internal static class CurrentUserIdentity
+{
+    private static readonly AsyncLocal<CurrentUserState?> _current = new();
+
+    internal static CurrentUserState? Value
+    {
+        get => _current.Value;
+        set => _current.Value = value;
+    }
+}
+
+internal sealed record CurrentUserState(int UserId);
