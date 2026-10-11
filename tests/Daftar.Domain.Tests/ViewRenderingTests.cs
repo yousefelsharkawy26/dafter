@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using Avalonia.Headless;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -117,6 +118,39 @@ public sealed class ViewRenderingTests
             window.Content = new Views.SettingsView { DataContext = new ViewModels.SettingsViewModel(Container()) };
 
             Capture(window, "settings");
+        });
+    }
+
+    [Fact]
+    public void The_Login_Screen_Renders_No_Boolean_As_Text()
+    {
+        // The password toggle was written as
+        //   Text="{Binding RevealPassword, Converter={x:Null}, FallbackValue='👁️'}"
+        // which reads like it shows an eye and actually shows the word "False". A null converter
+        // is not a conversion: Avalonia falls back to ToString, and FallbackValue only rescues a
+        // binding that fails outright rather than one that converts badly.
+        //
+        // Walking the rendered tree is the only way to catch this class of bug. The build is
+        // happy -- the path is a real property -- and every view model test is happy.
+        // LoginWindow is already a Window, so it is shown directly rather than hosted in the
+        // scratch window the harness provides.
+        AvaloniaUi.Run(_ =>
+        {
+            var view = new Views.LoginWindow { DataContext = new ViewModels.LoginViewModel(Container()) };
+            view.Show();
+            AvaloniaUi.Settle();
+
+            Capture(view, "login");
+
+            var offenders = view.GetVisualDescendants()
+                .OfType<TextBlock>()
+                .Select(t => t.Text)
+                .Where(t => t is not null
+                            && (t.Equals("True", StringComparison.OrdinalIgnoreCase)
+                                || t.Equals("False", StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            Assert.Empty(offenders);
         });
     }
 

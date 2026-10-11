@@ -145,7 +145,7 @@
                                     Command="{Binding TogglePasswordVisibilityCommand}"
                                     Width="40" Height="38" Margin="4,0,0,0" Padding="0"
                                     ToolTip.Tip="إظهار / إخفاء كلمة المرور">
-                                <TextBlock Text="{Binding RevealPassword, Converter={x:Null}, FallbackValue='👁️'}"
+                                <TextBlock Text="👁️"
                                            FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
                         </Grid>
@@ -244,19 +244,19 @@
                     <!-- Validation Status Checks -->
                     <StackPanel Spacing="6" Margin="0,2,0,4">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="{Binding HasValidNewPasswordLength, Converter={x:Null}, FallbackValue='○'}"
-                                       Foreground="{Binding HasValidNewPasswordLength, Converter={x:Null}, FallbackValue='#888888'}"
+                            <TextBlock Text="{Binding HasValidNewPasswordLength, Converter={StaticResource BoolToMark}}"
+                                       Foreground="{Binding HasValidNewPasswordLength, Converter={StaticResource BoolToBrush}}"
                                        FontWeight="Bold" />
                             <TextBlock Text="كلمة المرور ٦ أحرف أو أكثر" FontSize="12"
-                                       Foreground="{Binding HasValidNewPasswordLength, Converter={x:Null}, FallbackValue='#555555'}" />
+                                       Foreground="{Binding HasValidNewPasswordLength, Converter={StaticResource BoolToDimBrush}}" />
                         </StackPanel>
 
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="{Binding PasswordsMatch, Converter={x:Null}, FallbackValue='○'}"
-                                       Foreground="{Binding PasswordsMatch, Converter={x:Null}, FallbackValue='#888888'}"
+                            <TextBlock Text="{Binding PasswordsMatch, Converter={StaticResource BoolToMark}}"
+                                       Foreground="{Binding PasswordsMatch, Converter={StaticResource BoolToBrush}}"
                                        FontWeight="Bold" />
                             <TextBlock Text="كلمتا المرور متطابقتان" FontSize="12"
-                                       Foreground="{Binding PasswordsMatch, Converter={x:Null}, FallbackValue='#555555'}" />
+                                       Foreground="{Binding PasswordsMatch, Converter={StaticResource BoolToDimBrush}}" />
                         </StackPanel>
                     </StackPanel>
 
