@@ -13,7 +13,18 @@ namespace Daftar.Desktop;
 /// </summary>
 internal sealed class FileLoggerProvider : ILoggerProvider
 {
-    private readonly string _logDirectory = Path.Combine(DaftarPaths.AppDataDirectory, "logs");
+    private readonly string _logDirectory;
+
+    public FileLoggerProvider()
+        : this(Path.Combine(DaftarPaths.AppDataDirectory, "logs"))
+    {
+    }
+
+    /// <param name="logDirectory">
+    /// Overridable so the reading side can be tested against a file this provider really wrote,
+    /// rather than against a hand-built string that would keep passing after the format moved.
+    /// </param>
+    internal FileLoggerProvider(string logDirectory) => _logDirectory = logDirectory;
 
     public ILogger CreateLogger(string categoryName) => new FileLogger(_logDirectory, categoryName);
 

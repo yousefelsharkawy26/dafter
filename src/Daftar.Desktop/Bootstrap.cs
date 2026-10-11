@@ -44,6 +44,7 @@ public static class Bootstrap
         services.AddTransient<PartiesViewModel>();
         services.AddTransient<StockViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<ErrorsViewModel>();
         services.AddTransient<ReportsViewModel>();
         services.AddTransient<ReturnsViewModel>();
         services.AddTransient<SessionsViewModel>();

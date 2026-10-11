@@ -1,0 +1,87 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Daftar.ViewModels"
+             xmlns:d="using:Daftar.Desktop.Diagnostics"
+             x:Class="Daftar.Views.ErrorsView"
+             x:DataType="vm:ErrorsViewModel"
+             FlowDirection="RightToLeft">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+
+        <!-- ========================================================
+             1. Header: what is broken, how much of it, and where it lives
+             ======================================================== -->
+        <Border Grid.Row="0" Classes="panel" Margin="0,0,0,12" Padding="16,12">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="سجل الأخطاء" Classes="subtitle" FontWeight="Bold" />
+                    <TextBlock Text="{Binding SummaryText}" Classes="caption muted" />
+                    <TextBlock Text="{Binding LogDirectoryText, StringFormat='الملفات: {0}'}"
+                               Classes="caption muted" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="90" Height="4" VerticalAlignment="Center" />
+                    <Button Classes="accent" Command="{Binding LoadCommand}" IsEnabled="{Binding !IsBusy}" Padding="18,9">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="🔄" FontSize="13" VerticalAlignment="Center" />
+                            <TextBlock Text="تحديث" FontWeight="Bold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ========================================================
+             2. The list. One row per fault, newest at the top.
+             ======================================================== -->
+        <Border Grid.Row="1" Classes="panel" Padding="8" IsVisible="{Binding HasEntries}"
+                x:Name="ErrorsListPanel">
+            <DataGrid x:Name="ErrorsGrid"
+                      ItemsSource="{Binding Entries}"
+                      SelectedItem="{Binding Selected, Mode=TwoWay}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      GridLinesVisibility="Horizontal">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="الوقت" Binding="{Binding TimeText}" Width="130" />
+                    <DataGridTextColumn Header="النوع" Binding="{Binding Level}" Width="90" />
+                    <DataGridTextColumn Header="المكان" Binding="{Binding Category}" Width="200" />
+                    <DataGridTextColumn Header="الرسالة" Binding="{Binding Message}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <Border Grid.Row="1" Classes="panel" Padding="24" IsVisible="{Binding !HasEntries}"
+                x:Name="ErrorsEmptyPanel">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6">
+                <TextBlock Text="✅" FontSize="30" HorizontalAlignment="Center" />
+                <TextBlock Text="مفيش أخطاء مسجّلة." Classes="subtitle" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding StatusMessage}" Classes="caption muted"
+                           TextWrapping="Wrap" MaxWidth="520" TextAlignment="Center"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+        <!-- ========================================================
+             3. The detail. The stack trace is the part that names the cause,
+                so it gets the full width rather than a truncated column.
+             ======================================================== -->
+        <Border Grid.Row="2" Classes="panel" Margin="0,12,0,0" Padding="16,12"
+                IsVisible="{Binding HasSelection}" MinHeight="150" MaxHeight="280"
+                x:Name="ErrorsDetailPanel">
+            <DockPanel LastChildFill="True">
+                <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" Classes="caption strong"
+                           Text="{Binding Selected.Message, StringFormat='التفاصيل: {0}'}"
+                           TextWrapping="Wrap" />
+
+                <TextBox DockPanel.Dock="Bottom" Classes="caption muted"
+                         Text="{Binding Selected.Detail}"
+                         IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                         Height="170"
+                         FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace" />
+            </DockPanel>
+        </Border>
+
+    </Grid>
+</UserControl>
