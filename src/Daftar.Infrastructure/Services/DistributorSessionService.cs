@@ -43,6 +43,10 @@ public sealed class DistributorSessionService(
         int userId,
         CancellationToken cancellationToken = default)
     {
+        // Settlement hands the company its money, pays commission and writes the van's stock
+        // down, all from one call. Without this anyone who could reach it could close a session.
+        context.RequirePermission(Daftar.Domain.Security.Role.Codes.PaymentsManage);
+
         var alreadyOpen = await context.DistributorSessions
             .AnyAsync(s => s.DistributorId == distributorId && s.Status == DistributorSessionStatus.Open, cancellationToken);
 
@@ -282,13 +286,18 @@ public sealed class DistributorSessionService(
         session.CommissionAmount = commission;
         session.StockCountId = countId;
 
-        // Commission is payable from the company, so it leaves the custody account when he has
-        // already banked it. Recorded as an expense against the same account for simplicity.
+        // The company's till. Commission is the company's cost, so it is paid from here rather
+        // than out of the money the distributor is carrying: charging the van meant the company
+        // received the handover and paid the commission out of the same pot, and the custody
+        // account went negative for a second and unrelated reason.
+        var mainCashAccount = await context.CashAccounts
+            .FirstOrDefaultAsync(a => a.Type == CashAccountType.Cash && a.IsActive, cancellationToken);
+
         if (commission > 0m)
         {
             context.CashTransactions.Add(new CashTransaction
             {
-                CashAccountId = distributor.CashAccountId,
+                CashAccountId = mainCashAccount?.Id ?? distributor.CashAccountId,
                 OccurredAt = DateTime.UtcNow,
                 BusinessDate = today,
                 Kind = CashTransactionKind.Expense,
@@ -300,43 +309,61 @@ public sealed class DistributorSessionService(
             });
         }
 
-        // Hand over counted cash from custody to company cashier account upon session close
-        if (countedCash > 0m)
+        // Hand over counted cash from custody to company cashier account upon session close.
+        // Counted, not expected: only what he actually has can be handed over. The gap between
+        // the two is dealt with below.
+        if (countedCash > 0m && mainCashAccount is not null && mainCashAccount.Id != distributor.CashAccountId)
         {
-            var mainCashAccount = await context.CashAccounts
-                .FirstOrDefaultAsync(a => a.Type == CashAccountType.Cash && a.IsActive, cancellationToken);
+            var transferRef = Guid.NewGuid().ToString("N");
+            var now = DateTime.UtcNow;
 
-            if (mainCashAccount is not null && mainCashAccount.Id != distributor.CashAccountId)
+            context.CashTransactions.Add(new CashTransaction
             {
-                var transferRef = Guid.NewGuid().ToString("N");
-                var now = DateTime.UtcNow;
+                CashAccountId = distributor.CashAccountId,
+                OccurredAt = now,
+                BusinessDate = today,
+                Kind = CashTransactionKind.TransferOut,
+                Amount = -countedCash,
+                DistributorSessionId = sessionId,
+                TransferRef = transferRef,
+                Note = $"تسليم عهدة نقدية للجولة {sessionId} من {distributor.Name}",
+                CreatedBy = userId,
+            });
 
-                context.CashTransactions.Add(new CashTransaction
-                {
-                    CashAccountId = distributor.CashAccountId,
-                    OccurredAt = now,
-                    BusinessDate = today,
-                    Kind = CashTransactionKind.TransferOut,
-                    Amount = -countedCash,
-                    DistributorSessionId = sessionId,
-                    TransferRef = transferRef,
-                    Note = $"تسليم عهدة نقدية للجولة {sessionId} من {distributor.Name}",
-                    CreatedBy = userId,
-                });
+            context.CashTransactions.Add(new CashTransaction
+            {
+                CashAccountId = mainCashAccount.Id,
+                OccurredAt = now,
+                BusinessDate = today,
+                Kind = CashTransactionKind.TransferIn,
+                Amount = countedCash,
+                DistributorSessionId = sessionId,
+                TransferRef = transferRef,
+                Note = $"استلام عهدة نقدية للجولة {sessionId} من {distributor.Name}",
+                CreatedBy = userId,
+            });
+        }
 
-                context.CashTransactions.Add(new CashTransaction
-                {
-                    CashAccountId = mainCashAccount.Id,
-                    OccurredAt = now,
-                    BusinessDate = today,
-                    Kind = CashTransactionKind.TransferIn,
-                    Amount = countedCash,
-                    DistributorSessionId = sessionId,
-                    TransferRef = transferRef,
-                    Note = $"استلام عهدة نقدية للجولة {sessionId} من {distributor.Name}",
-                    CreatedBy = userId,
-                });
-            }
+        // A custody account holds only money being carried for the company, so it must be empty
+        // once the session closes. Handing over the counted cash leaves any shortfall sitting
+        // there with nothing behind it: the balance said the distributor was still holding the
+        // company's money while the cash was simply gone. Writing the difference off as an
+        // adjustment makes the loss a row somebody can find, and puts the account back to zero.
+        if (cashDifference != 0m)
+        {
+            context.CashTransactions.Add(new CashTransaction
+            {
+                CashAccountId = distributor.CashAccountId,
+                OccurredAt = DateTime.UtcNow,
+                BusinessDate = today,
+                Kind = CashTransactionKind.Adjustment,
+                Amount = cashDifference,
+                DistributorSessionId = sessionId,
+                Note = cashDifference < 0
+                    ? $"عجز نقدي في جولة {sessionId} من {distributor.Name}"
+                    : $"زيادة نقدية في جولة {sessionId} من {distributor.Name}",
+                CreatedBy = userId,
+            });
         }
 
         await context.SaveChangesAsync(cancellationToken);

@@ -288,6 +288,117 @@ public sealed class DistributorsIntegrationTests : IAsyncLifetime, IDisposable
             .SingleAsync(b => b.LocationId == f.VehicleId).ContinueWith(t => t.Result.Quantity));
     }
 
+    /// <summary>
+    /// Runs the standard day: sell 20, collect 400 into custody, come back with 370.
+    /// </summary>
+    private async Task<(Fixture F, DistributorSession Session, SettlementResult Settlement, DaftarContext Ctx)>
+        SettleAShortSessionAsync()
+    {
+        var f = await ArrangeAsync(commissionRate: 10m);
+        var ctx = NewContext();
+        var session = await OpenSessionAsync(ctx, f.Distributor.Id);
+        await LoadVanAsync(ctx, session, f, 40m);
+
+        var sale = new Sale
+        {
+            Type = SaleType.Invoice,
+            PartyId = f.Customer.Id,
+            LocationId = f.VehicleId,
+            PriceListId = f.List.Id,
+            DocDate = Today,
+            DistributorId = f.Distributor.Id,
+            DistributorSessionId = session.Id,
+        };
+        ctx.Sales.Add(sale);
+        await ctx.SaveChangesAsync();
+        sale.AddItem(f.Product, f.Piece, 20m, 20m, 20m);
+        await ctx.SaveChangesAsync();
+        await new SalePostingService(ctx).PostAsync(sale.Id, 1, Today);
+
+        var payment = new Payment
+        {
+            Direction = PaymentDirection.In,
+            PartyId = f.Customer.Id,
+            CashAccountId = f.CustodyId,
+            Amount = 400m,
+            DocDate = Today,
+            DistributorSessionId = session.Id,
+        };
+        ctx.Payments.Add(payment);
+        await ctx.SaveChangesAsync();
+        await new PaymentPostingService(ctx).PostAsync(payment.Id, 1, Today);
+
+        var service = new DistributorSessionService(
+            ctx, new StockCountService(ctx), new StockTransferPostingService(ctx));
+
+        var settlement = await service.SettleAsync(
+            session.Id,
+            countedCash: 370m,
+            countedQuantities: new Dictionary<int, decimal> { [f.LotId] = 0m },
+            userId: 1);
+
+        return (f, session, settlement, ctx);
+    }
+
+    private static async Task<decimal> CashInAsync(DaftarContext ctx, int accountId)
+        => await ctx.CashTransactions
+            .Where(t => t.CashAccountId == accountId)
+            .Select(t => t.Amount)
+            .SumAsync(t => (decimal?)t) ?? 0m;
+
+    [Fact]
+    public async Task Settling_Leaves_The_Custody_Account_Empty()
+    {
+        // A custody account holds only money being carried for the company. When the session
+        // closes, the van is unloaded and the money handed over, so nothing should remain.
+        //
+        // It did. The handover moved the counted cash rather than the collected cash, so a short
+        // count silently left the shortfall sitting in the account; and the commission was charged
+        // to the same account on top, driving it negative for a second and unrelated reason. The
+        // company received 370 against 400 collected and the balance sheet showed neither.
+        var (f, _, _, ctx) = await SettleAShortSessionAsync();
+
+        Assert.Equal(0m, await CashInAsync(ctx, f.CustodyId));
+    }
+
+    [Fact]
+    public async Task A_Cash_Shortage_Becomes_A_Row_Somebody_Can_Find()
+    {
+        // The session snapshot carried CashDifference = -30 and the van's stock shortage, but the
+        // cash ledger carried nothing at all. The 30 was in the custody balance with no
+        // explanation, so the account no longer reconciled with the money that existed.
+        var (f, session, settlement, ctx) = await SettleAShortSessionAsync();
+
+        Assert.Equal(-30m, settlement.CashDifference);
+
+        var rows = await ctx.CashTransactions
+            .Where(t => t.CashAccountId == f.CustodyId && t.DistributorSessionId == session.Id)
+            .ToListAsync();
+
+        Assert.Contains(rows, t => t.Kind == CashTransactionKind.Adjustment && t.Amount == -30m);
+    }
+
+    [Fact]
+    public async Task Commission_Is_Paid_Out_Of_The_Company_Not_Out_Of_The_Van()
+    {
+        // The code says so: "Commission is payable from the company." Charging the van instead
+        // means the company receives the handover and pays the commission out of the same pot,
+        // which is charged twice against the day's takings and leaves the van account negative.
+        var (f, session, settlement, ctx) = await SettleAShortSessionAsync();
+
+        var commissionRows = await ctx.CashTransactions
+            .Where(t => t.DistributorSessionId == session.Id
+                     && t.Category == ExpenseCategory.Commission)
+            .ToListAsync();
+
+        var row = Assert.Single(commissionRows);
+        Assert.Equal(f.CashId, row.CashAccountId);
+        Assert.Equal(-settlement.CommissionAmount, row.Amount);
+
+        // And the company paid for it, on top of receiving the handover.
+        Assert.Equal(370m - settlement.CommissionAmount, await CashInAsync(ctx, f.CashId));
+    }
+
     [Fact]
     public async Task SettlingTwice_IsRefused()
     {

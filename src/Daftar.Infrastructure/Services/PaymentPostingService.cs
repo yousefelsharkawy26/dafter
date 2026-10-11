@@ -110,6 +110,11 @@ public sealed class PaymentPostingService(DaftarContext context)
         string? transferRef = null,
         CancellationToken cancellationToken = default)
     {
+        // Expenses, deposits and withdrawals move money out of an account exactly as a voucher
+        // does. PostAsync checks PaymentsManage; these did not, so a role without it could still
+        // empty the till by calling them directly.
+        context.RequirePermission(Daftar.Domain.Security.Role.Codes.PaymentsManage);
+
         if (amount <= 0m)
             throw new DomainException("A cash movement amount must be positive.");
 
@@ -143,6 +148,10 @@ public sealed class PaymentPostingService(DaftarContext context)
         DateOnly businessDate,
         CancellationToken cancellationToken = default)
     {
+        // Moving money between two of the company's own accounts is still moving money, and it
+        // is how a till gets emptied without a voucher existing to explain it.
+        context.RequirePermission(Daftar.Domain.Security.Role.Codes.PaymentsManage);
+
         if (fromAccountId == toAccountId)
             throw new DomainException("A transfer needs two different accounts.");
         if (amount <= 0m)

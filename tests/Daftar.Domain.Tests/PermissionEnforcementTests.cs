@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Daftar.Domain.Distributors;
+using Daftar.Domain.Finance;
 using Daftar.Domain.Inventory;
 using Daftar.Domain.Parties;
 using Daftar.Domain.Sales;
@@ -553,6 +555,114 @@ public sealed class PermissionEnforcementTests : IAsyncLifetime, IDisposable
                     lot.Id, location, 1m, "Damage", 1, new DateOnly(2026, 10, 7)));
 
             Assert.Contains(Role.Codes.StockScrap, ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+    }
+
+    [Fact]
+    public async Task Moving_An_Expense_Out_Of_The_Till_Needs_Payments_Manage()
+    {
+        // PostAsync has always checked this. The two paths beside it did not, so the same role
+        // that could not raise a voucher could still empty the cash account by calling them.
+        var clerkId = await CreateUserAsync("nopayments", Role.Codes.SalesCreate);
+
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(clerkId);
+        try
+        {
+            using var scope = _services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+            var till = await ctx.CashAccounts.Select(c => c.Id).FirstAsync();
+
+            var ex = await Assert.ThrowsAsync<Domain.Shared.DomainException>(() =>
+                new PaymentPostingService(ctx).RecordCashMovementAsync(
+                    till, CashTransactionKind.Expense, 500m, 1, new DateOnly(2026, 10, 7)));
+
+            Assert.Contains(Role.Codes.PaymentsManage, ex.Message, StringComparison.Ordinal);
+
+            // And nothing was written on the way to the refusal.
+            Assert.Empty(await ctx.CashTransactions.Where(t => t.CashAccountId == till).ToListAsync());
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+    }
+
+    [Fact]
+    public async Task Transferring_Money_Between_Accounts_Needs_Payments_Manage()
+    {
+        var clerkId = await CreateUserAsync("notransfer", Role.Codes.SalesCreate);
+
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(clerkId);
+        try
+        {
+            using var scope = _services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+            var accounts = await ctx.CashAccounts.Select(c => c.Id).Take(2).ToListAsync();
+
+            if (accounts.Count < 2)
+            {
+                // Only the seeded till exists in a fresh database; nothing to transfer between.
+                return;
+            }
+
+            var ex = await Assert.ThrowsAsync<Domain.Shared.DomainException>(() =>
+                new PaymentPostingService(ctx).TransferBetweenAccountsAsync(
+                    accounts[0], accounts[1], 250m, 1, new DateOnly(2026, 10, 7)));
+
+            Assert.Contains(Role.Codes.PaymentsManage, ex.Message, StringComparison.Ordinal);
+
+            Assert.Empty(await ctx.CashTransactions
+                .Where(t => accounts.Contains(t.CashAccountId))
+                .ToListAsync());
+        }
+        finally
+        {
+            _services.GetRequiredService<ICurrentUser>().SignOut();
+        }
+    }
+
+    [Fact]
+    public async Task Opening_A_Distributor_Session_Needs_Payments_Manage()
+    {
+        // Settlement is where the company's money is collected and the commission is paid, so
+        // the session that leads to it is not a free action either.
+        var clerkId = await CreateUserAsync("nodistributor", Role.Codes.SalesCreate);
+
+        (_services.GetRequiredService<ICurrentUser>() as CurrentUser)!.SignIn(clerkId);
+        try
+        {
+            using var scope = _services.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+
+            var van = new StockLocation { Name = "Van", Type = StockLocationType.Vehicle };
+            var custody = new CashAccount { Name = "Van cash", Type = CashAccountType.DistributorCustody };
+            ctx.StockLocations.Add(van);
+            ctx.CashAccounts.Add(custody);
+            await ctx.SaveChangesAsync();
+
+            var distributor = new Distributor
+            {
+                Name = "موزع",
+                StockLocationId = van.Id,
+                CashAccountId = custody.Id,
+                CommissionRate = 10m,
+                CommissionBasis = CommissionBasis.Sales,
+            };
+            ctx.Distributors.Add(distributor);
+            await ctx.SaveChangesAsync();
+
+            var ex = await Assert.ThrowsAsync<Domain.Shared.DomainException>(() =>
+                new DistributorSessionService(
+                    ctx,
+                    new StockCountService(ctx),
+                    new StockTransferPostingService(ctx))
+                    .OpenAsync(distributor.Id, 1));
+
+            Assert.Contains(Role.Codes.PaymentsManage, ex.Message, StringComparison.Ordinal);
         }
         finally
         {
