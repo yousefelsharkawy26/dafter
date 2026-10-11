@@ -44,6 +44,56 @@ public sealed class SalePostingService(DaftarContext context)
         }
     }
 
+    /// <summary>
+    /// Refuses the sale when the customer's resulting balance exceeds their credit limit.
+    ///
+    /// <para>
+    /// <see cref="Daftar.Domain.Parties.Party.CreditLimit"/> has been stored, edited behind its
+    /// own permission and shown on screen since the schema was written, and nothing consulted it.
+    /// A customer with a 500 limit could be invoiced for anything, and the limit on the parties
+    /// screen was a note rather than a rule.
+    /// </para>
+    ///
+    /// <para>
+    /// The check belongs here, after the voucher, and not inside <see cref="PostAsync"/>: the
+    /// invoice is posted first because the voucher references it, so mid-transaction the balance
+    /// sits at its peak and a cash sale would be refused for headroom the customer never used.
+    /// Reading the ledger here gives the figure the customer is actually left owing.
+    /// </para>
+    ///
+    /// <para>
+    /// Being a separate call rather than an invariant, it holds only where a caller invokes it.
+    /// The two paths that create an invoice do; the return path reduces the balance and so cannot
+    /// breach a limit from below.
+    /// </para>
+    /// </summary>
+    public async Task EnsureCreditAllowsAsync(int saleId, CancellationToken cancellationToken = default)
+    {
+        var sale = await context.Sales
+            .Where(s => s.Id == saleId)
+            .Select(s => new { s.PartyId, s.Party!.Name, s.Party!.CreditLimit, s.Party!.Status })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new DomainException($"Sale {saleId} does not exist.");
+
+        if (sale.Status != Domain.Parties.PartyStatus.Active)
+            throw new DomainException(
+                $"حساب '{sale.Name}' مش نشط، مش ينفع تتباعله فاتورة.");
+
+        // The ledger is the balance of record. Both the invoice and the voucher are already in
+        // it by now, so this is what the customer is left owing, not what they were charged.
+        var balance = Rounding.Amount(await context.PartyAccountTransactions
+            .Where(t => t.PartyId == sale.PartyId)
+            .Select(t => (decimal?)t.Amount)
+            .SumAsync(cancellationToken) ?? 0m);
+
+        // Only what they owe us is credit. A negative balance is money they are owed, which no
+        // limit should cap.
+        if (balance > 0m && balance > sale.CreditLimit)
+            throw new DomainException(
+                $"رصيد '{sale.Name}' بعد الفاتورة {balance:N2} ج.م، وهو أكبر من حد الائتمان "
+                + $"{sale.CreditLimit:N2} ج.م. عدّل الحد أو حطّم نقدي.");
+    }
+
     private async Task<SalePostingResult> PostCoreAsync(
         int saleId,
         int userId,

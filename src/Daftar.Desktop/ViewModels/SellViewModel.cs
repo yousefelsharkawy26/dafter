@@ -1003,6 +1003,10 @@ public partial class SellViewModel : ObservableObject
                 return;
             }
 
+            // Now that the voucher is in, the credit limit can be judged against what the
+            // customer is actually left owing rather than the invoice total.
+            await new SalePostingService(ctx).EnsureCreditAllowsAsync(sale.Id);
+
             await tx.CommitAsync(default);
 
             Status = $"تم حفظ {result.DocNo} — الإجمالي {DashboardViewModel.Money(sale.Total)}";

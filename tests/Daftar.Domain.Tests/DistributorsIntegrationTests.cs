@@ -400,6 +400,52 @@ public sealed class DistributorsIntegrationTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task An_Empty_Van_Is_Not_Counted_Again()
+    {
+        // "A van with nothing on it has nothing to count" is what the code says it does. What it
+        // actually asked was whether a balance row exists, and a row is left behind at zero after
+        // a full sale -- so every later session produced a stock count document for an empty van,
+        // consuming a number and posting a count with no lines in it.
+        var f = await ArrangeAsync(commissionRate: 0m);
+        var ctx = NewContext();
+        var session = await OpenSessionAsync(ctx, f.Distributor.Id);
+        await LoadVanAsync(ctx, session, f, 20m);
+
+        // Sell the whole load. The balance row survives at zero.
+        var sale = new Sale
+        {
+            Type = SaleType.Invoice,
+            PartyId = f.Customer.Id,
+            LocationId = f.VehicleId,
+            PriceListId = f.List.Id,
+            DocDate = Today,
+            DistributorId = f.Distributor.Id,
+            DistributorSessionId = session.Id,
+        };
+        ctx.Sales.Add(sale);
+        await ctx.SaveChangesAsync();
+        sale.AddItem(f.Product, f.Piece, 20m, 20m, 20m);
+        await ctx.SaveChangesAsync();
+        await new SalePostingService(ctx).PostAsync(sale.Id, 1, Today);
+
+        Assert.Equal(0m, await ctx.StockBalances
+            .Where(b => b.LocationId == f.VehicleId)
+            .Select(b => b.Quantity)
+            .FirstAsync());
+
+        var service = new DistributorSessionService(
+            ctx, new StockCountService(ctx), new StockTransferPostingService(ctx));
+
+        var settlement = await service.SettleAsync(session.Id, countedCash: 0m, userId: 1);
+
+        Assert.Null(settlement.StockCountId);
+        Assert.Null(settlement.CountDocNo);
+        Assert.Empty(await ctx.StockCounts
+            .Where(c => c.DistributorSessionId == session.Id)
+            .ToListAsync());
+    }
+
+    [Fact]
     public async Task SettlingTwice_IsRefused()
     {
         var f = await ArrangeAsync();

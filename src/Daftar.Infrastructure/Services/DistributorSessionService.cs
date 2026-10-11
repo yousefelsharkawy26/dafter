@@ -202,9 +202,16 @@ public sealed class DistributorSessionService(
 
         // 1. Count the vehicle. A van with nothing on it has nothing to count, and a count document
         // with no lines is not a document — so the count is skipped rather than failing settlement.
+        //
+        // "Nothing on it" means a non-zero quantity, not merely that a balance row exists. Selling
+        // a lot out empties it by taking the quantity to zero rather than deleting the row, so
+        // asking only whether the row was present counted every van that had ever been loaded and
+        // produced a count document with no lines on every session thereafter.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var hasStock = await context.StockBalances
-            .AnyAsync(b => b.LocationId == distributor.StockLocationId, cancellationToken);
+            .AnyAsync(b => b.LocationId == distributor.StockLocationId
+                        && b.Quantity != 0m,
+                     cancellationToken);
 
         int? countId = null;
         string? countDocNo = null;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -1296,13 +1297,16 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             if (l.Quantity > l.Available) { WizardError = $"الكمية لـ '{l.ProductName}' تتجاوز المتاح."; return; }
 
         IsBusy = true; WizardError = string.Empty; StatusMessage = "جاري تسجيل المعاملة...";
+        TransactionScope? tx = null;
         try
         {
             using var scope = _services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+            tx = await TransactionScope.BeginAsync(db, CancellationToken.None);
             var today = DateOnly.FromDateTime(DateTime.Now);
 
             string? docNo = null;
+            int? invoiceId = null;
 
             if (lines.Count > 0)
             {
@@ -1329,6 +1333,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
                 await db.SaveChangesAsync();
                 var result = await new SalePostingService(db).PostAsync(sale.Id, userId: 1, today);
                 docNo = result.DocNo;
+                invoiceId = sale.Id;
 
                 // If customer paid cash towards this invoice, record and post payment voucher
                 if (WizardPaidAmount > 0m && _wizardDistributorCashAccountId > 0)
@@ -1375,6 +1380,13 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
                 await new PaymentPostingService(db).PostAsync(colPayment.Id, userId: 1, today);
             }
 
+            // After the invoice and both vouchers, so the limit is judged against what the
+            // customer is left owing rather than what they were charged.
+            if (invoiceId is { } posted)
+                await new SalePostingService(db).EnsureCreditAllowsAsync(posted);
+
+            await tx.CommitAsync();
+
             await RefreshWizardSessionSalesAsync(db);
 
             var paymentsAfterInvoice = await db.Payments.AsNoTracking()
@@ -1407,7 +1419,14 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             OnPropertyChanged(nameof(WizardTitle));
             WizardStep = WizardStep.Settle_Customer;
         }
-        catch (Exception ex) { WizardError = $"فشل التسجيل: {ex.Message}"; StatusMessage = WizardError; }
+        catch (Exception ex)
+        {
+            // Without this the invoice and the vouchers committed before the failure, and the
+            // wizard reported the error while leaving the customer half-settled.
+            if (tx is not null) await tx.RollbackAsync();
+            WizardError = $"فشل التسجيل: {ex.Message}";
+            StatusMessage = WizardError;
+        }
         finally { IsBusy = false; }
     }
 

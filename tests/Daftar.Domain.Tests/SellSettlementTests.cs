@@ -32,12 +32,15 @@ public sealed class SellSettlementTests : IAsyncLifetime, IDisposable
             PasswordHasher.Hash("admin"));
 
         var ctx = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+        // A limit, because these tests are about how a sale settles rather than whether credit
+        // is allowed, and a limit of zero means cash only. CreditLimitTests covers the refusal.
         ctx.Parties.Add(new Party
         {
             Code = "C-SELL",
             Name = "عميل بيع",
             IsCustomer = true,
             CustomerType = CustomerType.Retail,
+            CreditLimit = 10_000m,
         });
 
         var product = new Domain.Catalog.Product("SELL-1", "صنف بيع");
