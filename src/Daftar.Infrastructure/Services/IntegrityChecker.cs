@@ -102,28 +102,49 @@ public sealed class IntegrityChecker(DaftarContext context)
         return problems;
     }
 
-    /// <summary>2. Every posted sale, purchase or payment has exactly one ledger row.</summary>
-    private async Task<List<IntegrityProblem>> PostedDocumentsHaveLedgerRowsAsync(
+    /// <summary>
+    /// 2. Every posted sale, purchase or payment has exactly one ledger row, carrying the right
+    /// amount.
+    ///
+    /// The amounts are the point. A row that exists but says 90 for a 100 invoice passes a
+    /// count-only check and leaves the customer over-billed by 10 with nothing to notice it. The
+    /// sign is compared by magnitude, because the sign is the ledger's own convention and is
+    /// already guarded by PartyAccountTransaction.Validate; what matters here is that the two
+    /// sides are the same number.
+    /// </summary>
+    private static void PostedDocumentsHaveLedgerRows(
         string kind,
-        IReadOnlyList<(int DocumentId, string DocNo)> posted,
-        IReadOnlyList<(int SourceId, string Kind)> ledgerRows,
+        IReadOnlyList<(int DocumentId, string DocNo, decimal Total)> posted,
+        IReadOnlyList<(int SourceId, decimal Amount)> ledgerRows,
         List<IntegrityProblem> problems)
     {
-        foreach (var (documentId, docNo) in posted)
+        foreach (var (documentId, docNo, total) in posted)
         {
-            var count = ledgerRows.Count(r => r.SourceId == documentId);
+            var rows = ledgerRows.Where(r => r.SourceId == documentId).ToList();
 
-            if (count == 0)
+            if (rows.Count == 0)
+            {
                 problems.Add(new IntegrityProblem(
                     $"{kind}-ledger-row",
                     $"Posted {kind} {docNo} has no PartyAccountTransactions row."));
-            else if (count > 1)
+                continue;
+            }
+
+            if (rows.Count > 1)
+            {
                 problems.Add(new IntegrityProblem(
                     $"{kind}-ledger-row",
-                    $"Posted {kind} {docNo} has {count} ledger rows; expected exactly 1."));
-        }
+                    $"Posted {kind} {docNo} has {rows.Count} ledger rows; expected exactly 1."));
+                continue;
+            }
 
-        return problems;
+            if (Math.Abs(rows[0].Amount) != Math.Abs(total))
+            {
+                problems.Add(new IntegrityProblem(
+                    $"{kind}-ledger-amount",
+                    $"Posted {kind} {docNo} is {total} but its ledger row says {rows[0].Amount}."));
+            }
+        }
     }
 
     private async Task<List<IntegrityProblem>> EveryPostedDocumentHasItsLedgerRowAsync(CancellationToken ct)
@@ -132,50 +153,94 @@ public sealed class IntegrityChecker(DaftarContext context)
 
         var sales = await context.Sales
             .Where(s => s.Status == Shared.DocumentStatus.Posted)
-            .Select(s => new { s.Id, s.DocNo })
+            .Select(s => new { s.Id, s.DocNo, s.Total })
             .ToListAsync(ct);
         var purchases = await context.Purchases
             .Where(p => p.Status == Shared.DocumentStatus.Posted)
-            .Select(p => new { p.Id, p.DocNo })
+            .Select(p => new { p.Id, p.DocNo, p.Total })
             .ToListAsync(ct);
+
+        // Spelled out with || rather than an `is` pattern: this is translated to SQL, and an
+        // expression tree cannot carry a pattern match.
         var ledgerRows = await context.PartyAccountTransactions
-            .Select(t => new { t.SourceId, t.SourceType, t.Kind })
+            .Where(t => t.SourceType == "Sale" || t.SourceType == "Purchase" || t.SourceType == "Payment")
+            .Select(t => new { t.SourceId, t.SourceType, t.Amount })
             .ToListAsync(ct);
 
-        var byKind = ledgerRows
-            .Where(r => r.SourceType is "Sale" or "Purchase")
-            .Select(r => (r.SourceId ?? 0, r.SourceType))
-            .ToList();
+        PostedDocumentsHaveLedgerRows(
+            "sale",
+            sales.Select(s => (s.Id, s.DocNo ?? "?", s.Total)).ToList(),
+            ledgerRows.Where(r => r.SourceType == "Sale")
+                .Select(r => (r.SourceId ?? 0, r.Amount)).ToList(),
+            problems);
 
-        await PostedDocumentsHaveLedgerRowsAsync(
-            "sale", sales.Select(s => (s.Id, s.DocNo ?? "?")).ToList(),
-            byKind.Where(r => r.Item2 == "Sale").Select(r => (r.Item1, r.Item2)).ToList(), problems);
+        PostedDocumentsHaveLedgerRows(
+            "purchase",
+            purchases.Select(p => (p.Id, p.DocNo ?? "?", p.Total)).ToList(),
+            ledgerRows.Where(r => r.SourceType == "Purchase")
+                .Select(r => (r.SourceId ?? 0, r.Amount)).ToList(),
+            problems);
 
-        await PostedDocumentsHaveLedgerRowsAsync(
-            "purchase", purchases.Select(p => (p.Id, p.DocNo ?? "?")).ToList(),
-            byKind.Where(r => r.Item2 == "Purchase").Select(r => (r.Item1, r.Item2)).ToList(), problems);
-
-        // Every posted payment has exactly one cash row.
+        // A payment moves money in two places at once: the cash account it came out of, and the
+        // party's balance it settles. Either one moving without the other is a real discrepancy,
+        // and both were previously unchecked.
         var payments = await context.Payments
             .Where(p => p.Status == Shared.DocumentStatus.Posted)
-            .Select(p => new { p.Id, p.DocNo })
+            .Select(p => new { p.Id, p.DocNo, p.Amount })
             .ToListAsync(ct);
+
         var cashRows = await context.CashTransactions
             .Where(t => t.PaymentId != null)
-            .Select(t => t.PaymentId!.Value)
+            .Select(t => new { PaymentId = t.PaymentId!.Value, t.Amount })
             .ToListAsync(ct);
 
         foreach (var payment in payments)
         {
-            var count = cashRows.Count(id => id == payment.Id);
-            if (count == 0)
+            var expected = Math.Abs(payment.Amount);
+
+            var cash = cashRows.Where(r => r.PaymentId == payment.Id).ToList();
+            if (cash.Count == 0)
+            {
                 problems.Add(new IntegrityProblem(
                     "payment-cash-row",
                     $"Posted payment {payment.DocNo} has no CashTransactions row."));
-            else if (count > 1)
+            }
+            else if (cash.Count > 1)
+            {
                 problems.Add(new IntegrityProblem(
                     "payment-cash-row",
-                    $"Posted payment {payment.DocNo} has {count} cash rows; expected exactly 1."));
+                    $"Posted payment {payment.DocNo} has {cash.Count} cash rows; expected exactly 1."));
+            }
+            else if (Math.Abs(cash[0].Amount) != expected)
+            {
+                problems.Add(new IntegrityProblem(
+                    "payment-cash-amount",
+                    $"Posted payment {payment.DocNo} is {payment.Amount} "
+                    + $"but its cash row says {cash[0].Amount}."));
+            }
+
+            var partyRows = ledgerRows
+                .Where(r => r.SourceType == "Payment" && r.SourceId == payment.Id)
+                .ToList();
+
+            if (partyRows.Count == 0)
+            {
+                problems.Add(new IntegrityProblem(
+                    "payment-ledger-row",
+                    $"Posted payment {payment.DocNo} has no PartyAccountTransactions row, "
+                    + "so the amount collected never settled against the party's balance."));
+            }
+            else
+            {
+                var settled = partyRows.Sum(r => r.Amount);
+                if (Math.Abs(settled) != expected)
+                {
+                    problems.Add(new IntegrityProblem(
+                        "payment-ledger-amount",
+                        $"Posted payment {payment.DocNo} is {payment.Amount} "
+                        + $"but its ledger rows settle to {settled}."));
+                }
+            }
         }
 
         return problems;

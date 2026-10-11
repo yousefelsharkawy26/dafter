@@ -1,4 +1,5 @@
 using Daftar.Domain.Catalog;
+using Daftar.Domain.Finance;
 using Daftar.Domain.Inventory;
 using Daftar.Domain.Parties;
 using Daftar.Domain.Purchasing;
@@ -335,6 +336,125 @@ public sealed class PriceReturnsAndIntegrityTests : IAsyncLifetime, IDisposable
         var report = await new IntegrityChecker(ctx).RunAllAsync();
 
         Assert.True(report.IsClean, report.ToString());
+    }
+
+    /// <summary>
+    /// The append-only triggers refuse exactly the edit these tests need, and that is the point:
+    /// the application cannot produce a drifted ledger. The trigger file says so itself -- they
+    /// guard against bugs, not against someone with access to the file. The way a real ledger
+    /// drifts is a restored backup or a hand-edited database, so that is what these reproduce:
+    /// the guard comes off, the data is wrong, and the checker has to notice.
+    /// </summary>
+    private static async Task WithLedgersEditableAsync(DaftarContext ctx, Func<Task> drift)
+    {
+        foreach (var table in new[] { "PartyAccountTransactions", "CashTransactions" })
+        {
+            await ctx.Database.ExecuteSqlRawAsync($"DROP TRIGGER IF EXISTS trg_{table}_no_update;");
+            await ctx.Database.ExecuteSqlRawAsync($"DROP TRIGGER IF EXISTS trg_{table}_no_delete;");
+        }
+
+        try
+        {
+            await drift();
+        }
+        finally
+        {
+            foreach (var table in new[] { "PartyAccountTransactions", "CashTransactions" })
+            {
+                await ctx.Database.ExecuteSqlRawAsync(
+                    $"CREATE TRIGGER IF NOT EXISTS trg_{table}_no_update BEFORE UPDATE ON {table} "
+                    + $"BEGIN SELECT RAISE(ABORT, '{table} is append-only'); END;");
+                await ctx.Database.ExecuteSqlRawAsync(
+                    $"CREATE TRIGGER IF NOT EXISTS trg_{table}_no_delete BEFORE DELETE ON {table} "
+                    + $"BEGIN SELECT RAISE(ABORT, '{table} is append-only'); END;");
+            }
+        }
+    }
+
+    /// <summary>A posted collection voucher against the customer <see cref="ArrangeSoldAsync"/> made.</summary>
+    private static async Task<int> ArrangePaymentAsync(DaftarContext ctx, decimal amount)
+    {
+        var payment = new Payment
+        {
+            PartyId = await ctx.Parties.Where(p => p.IsCustomer).Select(p => p.Id).FirstAsync(),
+            CashAccountId = await ctx.CashAccounts.Select(c => c.Id).FirstAsync(),
+            Amount = amount,
+            Direction = PaymentDirection.In,
+            DocDate = Today,
+        };
+
+        ctx.Payments.Add(payment);
+        await ctx.SaveChangesAsync();
+        await new PaymentPostingService(ctx).PostAsync(payment.Id, 1, Today);
+
+        return payment.Id;
+    }
+
+    [Fact]
+    public async Task IntegrityChecker_Spots_A_Ledger_Row_For_The_Wrong_Amount()
+    {
+        // The row exists, so a count check passes and the ledger reports itself healthy while the
+        // customer is over-billed. That is the whole reason the amount is compared and not just
+        // the presence of a row.
+        await ArrangeSoldAsync(quantity: 10m, unitPrice: 20m);
+        var ctx = NewContext();
+
+        var saleId = await ctx.Sales
+            .Where(s => s.Status == DocumentStatus.Posted && s.Type == SaleType.Invoice)
+            .Select(s => (int?)s.Id)
+            .FirstAsync() ?? 0;
+
+        await WithLedgersEditableAsync(ctx, () =>
+            ctx.Database.ExecuteSqlRawAsync(
+                "UPDATE PartyAccountTransactions SET Amount = '1' "
+                + "WHERE SourceType = 'Sale' AND SourceId = {0}",
+                saleId));
+
+        var report = await new IntegrityChecker(ctx).RunAllAsync();
+
+        Assert.False(report.IsClean);
+        Assert.Contains(report.Problems, p => p.Check == "sale-ledger-amount");
+    }
+
+    [Fact]
+    public async Task IntegrityChecker_Spots_A_Cash_Row_For_The_Wrong_Amount()
+    {
+        // A payment moves money in two places at once, and only one of the two was ever checked.
+        await ArrangeSoldAsync(quantity: 10m, unitPrice: 20m);
+        var ctx = NewContext();
+
+        var paymentId = await ArrangePaymentAsync(ctx, 50m);
+
+        await WithLedgersEditableAsync(ctx, () =>
+            ctx.Database.ExecuteSqlRawAsync(
+                "UPDATE CashTransactions SET Amount = '-7' WHERE PaymentId = {0}", paymentId));
+
+        var report = await new IntegrityChecker(ctx).RunAllAsync();
+
+        Assert.False(report.IsClean);
+        Assert.Contains(report.Problems, p => p.Check == "payment-cash-amount");
+    }
+
+    [Fact]
+    public async Task IntegrityChecker_Spots_A_Payment_That_Never_Settled_The_Party()
+    {
+        // The voucher's cash row is right, so the money looks collected -- but the customer's
+        // balance was never touched, and the receivable stays open for money already taken.
+        await ArrangeSoldAsync(quantity: 10m, unitPrice: 20m);
+        var ctx = NewContext();
+
+        var paymentId = await ArrangePaymentAsync(ctx, 50m);
+
+        await WithLedgersEditableAsync(ctx, () =>
+            ctx.Database.ExecuteSqlRawAsync(
+                "DELETE FROM PartyAccountTransactions "
+                + "WHERE SourceType = 'Payment' AND SourceId = {0}",
+                paymentId));
+
+        var report = await new IntegrityChecker(ctx).RunAllAsync();
+
+        Assert.False(report.IsClean);
+        Assert.Contains(report.Problems, p => p.Check == "payment-ledger-row");
     }
 
     [Fact]
