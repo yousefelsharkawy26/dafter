@@ -17,6 +17,7 @@ using Daftar.Infrastructure;
 using Daftar.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -1028,6 +1029,7 @@ public partial class SellViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            _services.Report("Sell.PostAsync", ex);
             Status = $"فشل الحفظ: {ex.Message}";
         }
         finally

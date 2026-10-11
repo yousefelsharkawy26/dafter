@@ -12,6 +12,7 @@ using Daftar.Domain.Security;
 using Daftar.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -579,6 +580,7 @@ public partial class ReportsViewModel(IServiceProvider services) : ObservableObj
         }
         catch (Exception ex)
         {
+            _services.Report("Reports.LoadAsync", ex);
             StatusMessage = $"خطأ: {ex.Message}";
         }
         finally

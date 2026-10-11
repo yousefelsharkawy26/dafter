@@ -14,6 +14,7 @@ using Daftar.Domain.Shared;
 using Daftar.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -67,6 +68,7 @@ public partial class DashboardViewModel(IServiceProvider services) : ObservableO
         }
         catch (Exception ex)
         {
+            _services.Report("Dashboard.LoadAsync", ex);
             BusyText = $"خطأ: {ex.Message}";
         }
     }

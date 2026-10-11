@@ -10,6 +10,7 @@ using Daftar.Domain.Shared;
 using Daftar.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -52,6 +53,7 @@ public partial class ReceiveViewModel
         }
         catch (Exception ex)
         {
+            _services.Report("Receive.ScanAsync", ex);
             // A picker that throws must say so, not leave the manager tapping a dead button.
             ScanStatus = $"مش قادر يفتح الصور: {ex.Message}";
             return;
@@ -117,6 +119,7 @@ public partial class ReceiveViewModel
         }
         catch (Exception ex)
         {
+            _services.Report("Receive.ScanAsync", ex);
             ScanStatus = $"خطأ في القراءة: {ex.Message}";
         }
         finally

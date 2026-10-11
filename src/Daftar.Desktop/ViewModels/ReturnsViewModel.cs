@@ -11,6 +11,7 @@ using Daftar.Infrastructure;
 using Daftar.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -234,6 +235,7 @@ public partial class ReturnsViewModel(IServiceProvider services) : ObservableObj
         }
         catch (Exception ex)
         {
+            _services.Report("Returns.LoadAsync", ex);
             StatusMessage = $"خطأ: {ex.Message}";
         }
         finally
@@ -405,6 +407,7 @@ public partial class ReturnsViewModel(IServiceProvider services) : ObservableObj
         }
         catch (Exception ex)
         {
+            _services.Report("Returns.SearchInvoicesAsync", ex);
             CreateStatusMessage = $"خطأ: {ex.Message}";
         }
     }
@@ -482,6 +485,7 @@ public partial class ReturnsViewModel(IServiceProvider services) : ObservableObj
         }
         catch (Exception ex)
         {
+            _services.Report("Returns.SelectInvoiceAsync", ex);
             CreateStatusMessage = $"خطأ: {ex.Message}";
         }
     }
@@ -573,6 +577,7 @@ public partial class ReturnsViewModel(IServiceProvider services) : ObservableObj
         }
         catch (Exception ex)
         {
+            _services.Report("Returns.ConfirmAndPostReturnAsync", ex);
             CreateStatusMessage = $"خطأ: {ex.Message}";
         }
         finally
@@ -633,6 +638,7 @@ public partial class ReturnsViewModel(IServiceProvider services) : ObservableObj
         }
         catch (Exception ex)
         {
+            _services.Report("Returns.CreateReturnAsync", ex);
             CreateStatusMessage = $"خطأ: {ex.Message}";
         }
         finally

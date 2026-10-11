@@ -9,6 +9,7 @@ using Daftar.Infrastructure;
 using Daftar.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -191,6 +192,7 @@ public partial class LoginViewModel(IServiceProvider services) : ObservableObjec
         }
         catch (Exception ex)
         {
+            _services.Report("Login.SignInAsync", ex);
             Message = $"خطأ أثناء تسجيل الدخول: {ex.Message}";
         }
         finally
@@ -247,6 +249,7 @@ public partial class LoginViewModel(IServiceProvider services) : ObservableObjec
         }
         catch (Exception ex)
         {
+            _services.Report("Login.ChangePasswordAsync", ex);
             Message = $"خطأ أثناء حفظ كلمة المرور: {ex.Message}";
         }
         finally

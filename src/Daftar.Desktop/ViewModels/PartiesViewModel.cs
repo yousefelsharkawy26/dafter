@@ -12,6 +12,7 @@ using Daftar.Domain.Shared;
 using Daftar.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -212,6 +213,7 @@ public partial class PartiesViewModel(IServiceProvider services) : ObservableObj
         }
         catch (Exception ex)
         {
+            _services.Report("Parties.LoadPartiesAsync", ex);
             StatusMessage = $"خطأ في التحميل: {ex.Message}";
         }
         finally
@@ -477,6 +479,7 @@ public partial class PartiesViewModel(IServiceProvider services) : ObservableObj
         }
         catch (Exception ex)
         {
+            _services.Report("Parties.SavePartyAsync", ex);
             DialogErrorMessage = $"خطأ: {ex.Message}";
         }
         finally

@@ -17,6 +17,7 @@ using Daftar.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -771,6 +772,7 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
         }
         catch (Exception ex)
         {
+            _services.Report("Receive.PostAsync", ex);
             Status = $"فشل الحفظ: {ex.Message}";
         }
         finally

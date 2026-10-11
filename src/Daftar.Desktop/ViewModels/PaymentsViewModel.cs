@@ -13,6 +13,7 @@ using Daftar.Infrastructure;
 using Daftar.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -771,6 +772,7 @@ public partial class PaymentsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Payments.PostAsync", ex);
             Status = $"فشل الحفظ: {ex.Message}";
         }
         finally
@@ -825,6 +827,7 @@ public partial class PaymentsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Payments.PostMovementAsync", ex);
             Status = $"فشل تسجيل المصروف: {ex.Message}";
         }
         finally
@@ -886,6 +889,7 @@ public partial class PaymentsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Payments.PostTransferAsync", ex);
             Status = $"فشل التحويل: {ex.Message}";
         }
         finally

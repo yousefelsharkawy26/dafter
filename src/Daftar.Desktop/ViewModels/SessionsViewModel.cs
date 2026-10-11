@@ -16,6 +16,7 @@ using Daftar.Infrastructure;
 using Daftar.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -567,7 +568,11 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
 
             StatusMessage = $"تم التحميل — {Rows.Count} جولة، {Distributors.Count} موزع";
         }
-        catch (Exception ex) { StatusMessage = $"خطأ: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            _services.Report("Sessions.LoadAsync", ex);
+            StatusMessage = $"خطأ: {ex.Message}";
+        }
         finally { IsBusy = false; }
     }
 
@@ -730,7 +735,12 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             IsDistributorFormVisible = false;
             await LoadAsync();
         }
-        catch (Exception ex) { DistributorFormError = $"خطأ: {ex.Message}"; StatusMessage = DistributorFormError; }
+        catch (Exception ex)
+        {
+            _services.Report("Sessions.SaveDistributorAsync", ex);
+            DistributorFormError = $"خطأ: {ex.Message}";
+            StatusMessage = DistributorFormError;
+        }
         finally { IsBusy = false; }
     }
 
@@ -753,7 +763,11 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
                 await LoadAsync();
             }
         }
-        catch (Exception ex) { StatusMessage = $"خطأ: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            _services.Report("Sessions.ToggleDistributorActiveAsync", ex);
+            StatusMessage = $"خطأ: {ex.Message}";
+        }
         finally { IsBusy = false; }
     }
 
@@ -805,7 +819,12 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             StatusMessage = $"تم فتح الجولة #{session.Id}. اختر المنتجات للتحميل.";
             WizardStep = WizardStep.Open_LoadVehicle;
         }
-        catch (Exception ex) { WizardError = $"فشل فتح الجولة: {ex.Message}"; StatusMessage = WizardError; }
+        catch (Exception ex)
+        {
+            _services.Report("Sessions.WizardNext_OpenToLoadAsync", ex);
+            WizardError = $"فشل فتح الجولة: {ex.Message}";
+            StatusMessage = WizardError;
+        }
         finally { IsBusy = false; }
     }
 
@@ -911,7 +930,12 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             StatusMessage = $"✔ تم تحميل {lines.Count} صنف على سيارة {_wizardDistributorName}.";
             await LoadAsync();
         }
-        catch (Exception ex) { WizardError = $"فشل التحميل: {ex.Message}"; StatusMessage = WizardError; }
+        catch (Exception ex)
+        {
+            _services.Report("Sessions.WizardConfirmLoadVehicleAsync", ex);
+            WizardError = $"فشل التحميل: {ex.Message}";
+            StatusMessage = WizardError;
+        }
         finally { IsBusy = false; }
     }
 
@@ -965,7 +989,11 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
 
             await RefreshWizardSessionSalesAsync(db);
         }
-        catch (Exception ex) { WizardError = $"خطأ: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            _services.Report("Sessions.OpenSettleWizardAsync", ex);
+            WizardError = $"خطأ: {ex.Message}";
+        }
         finally { IsBusy = false; }
 
         WizardStep = WizardStep.Settle_Customer;
@@ -1039,7 +1067,11 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             WizardIsNewCustomerVisible = false;
             StatusMessage = $"تم إنشاء العميل '{party.Name}'.";
         }
-        catch (Exception ex) { WizardNewCustomerError = $"فشل: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            _services.Report("Sessions.WizardCreateCustomerAsync", ex);
+            WizardNewCustomerError = $"فشل: {ex.Message}";
+        }
         finally { IsBusy = false; }
     }
 
@@ -1085,7 +1117,11 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
 
             WizardStep = WizardStep.Settle_Products;
         }
-        catch (Exception ex) { WizardError = $"خطأ: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            _services.Report("Sessions.WizardNext_SettleToProductsAsync", ex);
+            WizardError = $"خطأ: {ex.Message}";
+        }
         finally { IsBusy = false; }
     }
 
@@ -1421,6 +1457,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Sessions.WizardRegisterInvoiceAsync", ex);
             // Without this the invoice and the vouchers committed before the failure, and the
             // wizard reported the error while leaving the customer half-settled.
             if (tx is not null) await tx.RollbackAsync();
@@ -1518,6 +1555,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Sessions.WizardGoToFinishAsync", ex);
             WizardError = $"خطأ: {ex.Message}";
         }
         finally
@@ -1565,7 +1603,12 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             StatusMessage = $"✔ تمت تسوية الجولة #{result.SessionId} | مبيعات: {result.SalesTotal:N2} ج.م | عمولة: {result.CommissionAmount:N2} ج.م{unloadMsg}";
             await LoadAsync();
         }
-        catch (Exception ex) { WizardError = $"فشل الإغلاق: {ex.Message}"; StatusMessage = WizardError; }
+        catch (Exception ex)
+        {
+            _services.Report("Sessions.WizardConfirmSettlementAsync", ex);
+            WizardError = $"فشل الإغلاق: {ex.Message}";
+            StatusMessage = WizardError;
+        }
         finally { IsBusy = false; }
     }
 
@@ -1708,6 +1751,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Sessions.ViewSessionDetailsAsync", ex);
             StatusMessage = $"خطأ في عرض التفاصيل: {ex.Message}";
         }
         finally

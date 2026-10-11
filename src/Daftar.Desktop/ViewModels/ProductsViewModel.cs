@@ -12,6 +12,7 @@ using Daftar.Domain.Shared;
 using Daftar.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -425,6 +426,7 @@ public partial class ProductsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Products.SaveProductEditAsync", ex);
             HasError = true;
             Status = $"خطأ: {ex.Message}";
         }
@@ -586,6 +588,7 @@ public partial class ProductsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Products.AddProductAsync", ex);
             HasError = true;
             Status = $"خطأ: {ex.Message}";
         }
@@ -744,6 +747,7 @@ public partial class ProductsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Products.AddUnitAsync", ex);
             HasError = true;
             Status = $"خطأ: {ex.Message}";
         }
@@ -869,6 +873,7 @@ public partial class ProductsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Products.UpdateUnitAsync", ex);
             HasError = true;
             Status = $"خطأ: {ex.Message}";
         }
@@ -951,6 +956,7 @@ public partial class ProductsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Products.DeleteUnitAsync", ex);
             HasError = true;
             Status = $"تعذر حذف الوحدة (مرتبطة بفواتير أو دفعات سابقة): {ex.Message}";
         }
@@ -1014,6 +1020,7 @@ public partial class ProductsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Products.AddPriceAsync", ex);
             HasError = true;
             Status = $"خطأ: {ex.Message}";
         }

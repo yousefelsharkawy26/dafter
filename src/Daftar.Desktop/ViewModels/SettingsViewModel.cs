@@ -12,6 +12,7 @@ using Daftar.Infrastructure;
 using Daftar.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Daftar.Desktop.Diagnostics;
 
 namespace Daftar.ViewModels;
 
@@ -154,6 +155,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Settings.LoadAsync", ex);
             StatusMessage = $"خطأ: {ex.Message}";
         }
         finally
@@ -252,6 +254,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Settings.SaveAsync", ex);
             StatusMessage = $"خطأ في الحفظ: {ex.Message}";
         }
         finally
@@ -345,6 +348,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Settings.CreateBackupAsync", ex);
             BackupStatusMessage = $"خطأ أثناء أخذ النسخة: {ex.Message}";
         }
         finally
@@ -376,6 +380,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Settings.ScheduleRestore", ex);
             BackupStatusMessage = $"مقدرتش أجدول الاستعادة: {ex.Message}";
         }
     }
@@ -439,6 +444,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Settings.OpenEditUserDialogAsync", ex);
             StatusMessage = $"خطأ: {ex.Message}";
         }
     }
@@ -562,6 +568,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Settings.SaveUserAsync", ex);
             UserDialogError = $"خطأ: {ex.Message}";
         }
         finally
@@ -600,6 +607,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Settings.ToggleUserActiveAsync", ex);
             StatusMessage = $"خطأ: {ex.Message}";
         }
     }
@@ -659,6 +667,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Settings.OpenEditRoleDialogAsync", ex);
             StatusMessage = $"خطأ: {ex.Message}";
         }
     }
@@ -745,6 +754,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         }
         catch (Exception ex)
         {
+            _services.Report("Settings.SaveRoleAsync", ex);
             RoleDialogError = $"خطأ: {ex.Message}";
         }
         finally
