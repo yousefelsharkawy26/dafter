@@ -347,6 +347,9 @@ public sealed class PriceReturnsAndIntegrityTests : IAsyncLifetime, IDisposable
     /// </summary>
     private static async Task WithLedgersEditableAsync(DaftarContext ctx, Func<Task> drift)
     {
+        // Raw SQL is the only way to create or drop a trigger. The interpolated table name is one
+        // of two literals in the array below -- nothing a caller supplies reaches this string.
+#pragma warning disable EF1002, EF1003
         foreach (var table in new[] { "PartyAccountTransactions", "CashTransactions" })
         {
             await ctx.Database.ExecuteSqlRawAsync($"DROP TRIGGER IF EXISTS trg_{table}_no_update;");
@@ -369,6 +372,7 @@ public sealed class PriceReturnsAndIntegrityTests : IAsyncLifetime, IDisposable
                     + $"BEGIN SELECT RAISE(ABORT, '{table} is append-only'); END;");
             }
         }
+#pragma warning restore EF1002, EF1003
     }
 
     /// <summary>A posted collection voucher against the customer <see cref="ArrangeSoldAsync"/> made.</summary>

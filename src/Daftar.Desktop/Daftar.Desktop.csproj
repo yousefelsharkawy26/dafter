@@ -13,6 +13,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The view rendering tests build the real App on the headless platform, which means they
+         need the entry point. InternalsVisibleTo rather than widening Program to public: the
+         app's surface should not grow for a test. -->
+    <InternalsVisibleTo Include="Daftar.Domain.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.3" />
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.1.2" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />

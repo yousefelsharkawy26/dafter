@@ -32,7 +32,21 @@ public partial class ReportsView : UserControl
         _viewModel = vm;
         vm.PropertyChanged += OnViewModelPropertyChanged;
 
+        // Apply the state the view model already has. Waiting for PropertyChanged instead would
+        // leave the cost columns on screen for every role that cannot use them: CanViewCost
+        // starts false, so for a cashier the load never changes it and no change is ever raised.
+        // Only the owner would have had the columns corrected, and only after their first load.
+        ApplyCostColumns(vm.CanViewCost);
+
         await vm.InitializeAsync();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ReportsViewModel.CanViewCost) || _viewModel is null)
+            return;
+
+        ApplyCostColumns(_viewModel.CanViewCost);
     }
 
     /// <summary>
@@ -45,19 +59,27 @@ public partial class ReportsView : UserControl
     /// Avalonia's DataGridColumn has no Visibility property and cannot be named with x:Name, so
     /// the columns are removed from the collection and held here instead.
     /// </summary>
-    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void ApplyCostColumns(bool canSee)
     {
-        if (e.PropertyName != nameof(ReportsViewModel.CanViewCost) || _viewModel is null)
-            return;
+        // Resolved by name rather than through the generated fields. The view model is assigned
+        // when TabHost constructs the page, which is before the page is attached to a visual tree
+        // -- and the generated fields are null until then. Reading them here returned null, the
+        // toggle did nothing, and the cost columns stayed on screen for exactly the roles that
+        // must not see them.
+        ToggleCostColumns(this.FindControl<DataGrid>("SalesGrid"), canSee,
+            "التكلفة", "صافي الربح", "نسبة الربح");
 
-        var canSee = _viewModel.CanViewCost;
-
-        ToggleCostColumns(SalesGrid, canSee, "التكلفة", "صافي الربح", "نسبة الربح");
-        ToggleCostColumns(ProductsGrid, canSee, "إجمالي التكلفة", "صافي الربح", "نسبة الربح %");
+        ToggleCostColumns(this.FindControl<DataGrid>("ProductsGrid"), canSee,
+            "إجمالي التكلفة", "صافي الربح", "نسبة الربح %");
     }
 
-    private void ToggleCostColumns(DataGrid grid, bool canSee, params string[] headers)
+    private void ToggleCostColumns(DataGrid? grid, bool canSee, params string[] headers)
     {
+        // A named control is null until the XAML has loaded. Hiding cost columns is not worth
+        // taking a screen down for, so a grid that is not there yet is simply skipped.
+        if (grid is null)
+            return;
+
         if (canSee)
         {
             if (!_withheld.Remove(grid, out var restored))

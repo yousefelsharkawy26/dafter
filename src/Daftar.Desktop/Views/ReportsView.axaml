@@ -70,10 +70,10 @@
         <!-- ========================================================
              2. KPI Summary Strip (5 Modern Metric Cards)
              ======================================================== -->
-        <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="12" Margin="0,0,0,12">
+        <UniformGrid Grid.Row="1" Columns="{Binding KpiCardCount}" Margin="0,0,0,12">
 
             <!-- Card 1: Sales -->
-            <Border Grid.Column="0" Classes="panel" Padding="14,12">
+            <Border Classes="panel" Padding="14,12" Margin="0,0,12,0">
                 <StackPanel Spacing="4">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Text="إجمالي المبيعات" Classes="caption muted" />
@@ -118,7 +118,7 @@
             </Border>
 
             <!-- Card 4: Collections -->
-            <Border Grid.Column="3" Classes="panel" Padding="14,12">
+            <Border Classes="panel" Padding="14,12" Margin="0,0,12,0">
                 <StackPanel Spacing="4">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Text="إجمالي التحصيلات" Classes="caption muted" />
@@ -130,7 +130,7 @@
             </Border>
 
             <!-- Card 5: Overdue Receivables -->
-            <Border Grid.Column="4" Classes="panel" Padding="14,12">
+            <Border Classes="panel" Padding="14,12" Margin="0,0,12,0">
                 <StackPanel Spacing="4">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Text="المتأخرات المستحقة" Classes="caption muted" />
@@ -140,7 +140,7 @@
                     <TextBlock Text="{Binding OverdueCountText}" Classes="caption muted" />
                 </StackPanel>
             </Border>
-        </Grid>
+        </UniformGrid>
 
         <!-- ========================================================
              3. Sub-Reports Area (Tabs & DataGrids)

@@ -118,8 +118,7 @@ sealed class Program
     }
 
     public static AppBuilder BuildAvaloniaApp(IServiceProvider? services = null)
-        => AppBuilder
-            .Configure(() => new App(services))
+        => ConfigureBuilder(services)
             .UsePlatformDetect()
 #if DEBUG
             .WithDeveloperTools()
@@ -128,4 +127,14 @@ sealed class Program
             // resolvable, so every control falls back to it for Arabic text.
             .AfterSetup(_ => Fonts.Register())
             .LogToTrace();
+
+    /// <summary>
+    /// The builder without a rendering platform attached.
+    ///
+    /// The tests call this and add the headless platform instead, so a view can be constructed,
+    /// laid out and rendered without an X server. Splitting it out is what keeps the platform
+    /// choice in one place rather than in every caller.
+    /// </summary>
+    public static AppBuilder ConfigureBuilder(IServiceProvider? services = null)
+        => AppBuilder.Configure(() => new App(services));
 }

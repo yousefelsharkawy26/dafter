@@ -1,2 +1,5 @@
 bin/
 obj/
+
+# Written by the view rendering tests on every run.
+screenshots/

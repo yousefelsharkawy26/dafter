@@ -141,7 +141,18 @@ public partial class ReportsViewModel(IServiceProvider services) : ObservableObj
     /// owns, so what it stops is a cashier opening the reports screen, not a determined user with
     /// a file manager.
     /// </summary>
-    [ObservableProperty] private bool _canViewCost;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KpiCardCount))]
+    private bool _canViewCost;
+
+    /// <summary>
+    /// How many cards the summary strip holds.
+    ///
+    /// The strip is a UniformGrid with a fixed column count, so hiding the cost and margin cards
+    /// without reducing it leaves an empty fifth of the bar -- two cards' worth of blank space
+    /// where numbers should be. Reducing the count makes what is left fill the width.
+    /// </summary>
+    public int KpiCardCount => CanViewCost ? 5 : 3;
 
     private const string Hidden = "—";
 
