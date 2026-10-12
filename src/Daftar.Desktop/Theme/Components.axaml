@@ -99,6 +99,18 @@
     <Style Selector="Border.badge.success > TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
     </Style>
+    <!-- Used once, on the receive tile, and never defined anywhere until now: the on-hand
+         figure rendered as a bare number floating on the tile with no chip around it and nothing
+         to say what it counted. A translucent white pill reads on the blue tile, and white text
+         is what the tile already sets, so this only has to supply the shape. -->
+    <Style Selector="Border.badge.info">
+        <Setter Property="Background" Value="#40FFFFFF" />
+    </Style>
+    <Style Selector="Border.badge.info > TextBlock">
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
     <Style Selector="Border.badge.count">
         <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
         <Setter Property="CornerRadius" Value="11" />

@@ -17,7 +17,8 @@ using Xunit;
 namespace Daftar.Domain.Tests;
 
 /// <summary>
-/// The product tiles on the sell and receive screens are painted in the Start button's blue.
+/// The product tiles on the sell and receive screens are painted in the Start button's blue, and an
+/// out-of-stock one stays grey and readable.
 ///
 /// <para>
 /// Colour is the one thing a build cannot check. XAML parses happily with a mistyped hex, and a
@@ -26,10 +27,8 @@ namespace Daftar.Domain.Tests;
 /// </para>
 ///
 /// <para>
-/// The text tests are the ones that matter. A TextBlock does not take its foreground from the
-/// button it sits in: repaint the tile blue and every unstyled line inside it stays dark. The
-/// receive tile also carries a badge class that was never defined anywhere in the project, so
-/// nothing at all was styling it.
+/// Both states are tested because they are the two things that can be wrong independently: a blue
+/// tile with dark text, and a grey one with white text. Each has its own failure and its own fix.
 /// </para>
 ///
 /// <para>
@@ -42,6 +41,10 @@ public sealed class ProductTileThemeTests : IAsyncLifetime, IDisposable
 {
     /// <summary>Theme.axaml, Button.start-btn.</summary>
     private static readonly Color StartBlue = Color.Parse("#0078D7");
+
+    private static readonly Color EmptyGrey = Color.Parse("#E9E9E9");
+
+    private static readonly Color EmptyText = Color.Parse("#3A3A3A");
 
     private readonly string _dbPath =
         Path.Combine(Path.GetTempPath(), $"daftar-tiles-{Guid.NewGuid():N}.db");
@@ -81,8 +84,8 @@ public sealed class ProductTileThemeTests : IAsyncLifetime, IDisposable
 
     /// <summary>
     /// Builds the view on the UI thread, not on the test thread. Avalonia's service locator is
-    /// per-thread, so a view constructed on the xUnit pool thread cannot resolve a cursor factory
-    /// and the first style that touches one throws -- which is what these two screens did.
+    /// per-thread, and a view built on the xUnit pool thread cannot resolve a cursor factory.
+    /// The seed runs after attach: both screens load on open and would clear anything added first.
     /// </summary>
     private static void Inspect(Func<Control> build, Action<Control> seed, Action<Button[]> check)
     {
@@ -90,8 +93,8 @@ public sealed class ProductTileThemeTests : IAsyncLifetime, IDisposable
 
         AvaloniaUi.Run(window =>
         {
-            // Sized: the tiles live in a repeater, and nothing in a template is realised until
-            // the grid has room for it.
+            // Sized: the tiles live in a repeater, and nothing in a template is realised until the
+            // grid has room for it.
             window.Width = 1500;
             window.Height = 950;
 
@@ -100,8 +103,6 @@ public sealed class ProductTileThemeTests : IAsyncLifetime, IDisposable
             window.Show();
             AvaloniaUi.Settle();
 
-            // Both screens load on attach and refill their product list from the database, which
-            // is empty here and would wipe anything added beforehand.
             seed(view);
             AvaloniaUi.Settle();
 
@@ -109,55 +110,114 @@ public sealed class ProductTileThemeTests : IAsyncLifetime, IDisposable
         });
     }
 
+    // ---------- arrangement ----------
+
+    private static Action<Control> SellProduct(bool inStock) => view =>
+    {
+        var option = new ProductOption(1, "SKU-1", "أرز مصري فاخر");
+        option.AvailableUnits.Add(new CartUnitOption(1, "كجم", 1m, 42m, 35m, inStock ? 12m : 0m));
+        option.SelectedUnit = option.AvailableUnits[0];
+
+        ((SellViewModel)view.DataContext!).FilteredProducts.Add(option);
+    };
+
+    private static Action<Control> ReceiveProduct(bool inStock) => view =>
+    {
+        var option = new ReceiveProductOption(1, "SKU-2", "زيت زيتون بكر");
+        option.AvailableUnits.Add(new ReceiveUnitOption(1, "لتر", 1m, 60m, inStock ? 5m : 0m));
+        option.SelectedUnit = option.AvailableUnits[0];
+
+        ((ReceiveViewModel)view.DataContext!).FilteredProducts.Add(option);
+    };
+
+    private Control SellView() => new Views.SellView { DataContext = new SellViewModel(_services) };
+
+    private Control ReceiveView() =>
+        new Views.ReceiveView { DataContext = new ReceiveViewModel(_services) };
+
+    // ---------- in stock: the blue tile ----------
+
     [Fact]
     public void The_Sell_Tile_Is_Painted_In_The_Start_Buttons_Blue()
     {
-        Inspect(
-            () => new Views.SellView { DataContext = new SellViewModel(_services) },
-            view => ((SellViewModel)view.DataContext!).FilteredProducts
-                .Add(new ProductOption(1, "SKU-1", "منتج تجريبي")),
-            tiles =>
+        Inspect(SellView, SellProduct(inStock: true), tiles =>
+        {
+            Assert.NotEmpty(tiles);
+            Assert.All(tiles, t =>
             {
-                Assert.NotEmpty(tiles);
-                Assert.All(tiles, t => Assert.Equal(StartBlue, ColourOf(t.Background)));
+                Assert.True(t.IsEnabled);
+                Assert.Equal(StartBlue, ColourOf(t.Background));
             });
+        });
     }
 
     [Fact]
     public void The_Receive_Tile_Is_Painted_In_The_Start_Buttons_Blue()
     {
-        Inspect(
-            () => new Views.ReceiveView { DataContext = new ReceiveViewModel(_services) },
-            view => ((ReceiveViewModel)view.DataContext!).FilteredProducts
-                .Add(new ReceiveProductOption(1, "SKU-2", "صنف استلام")),
-            tiles =>
-            {
-                Assert.NotEmpty(tiles);
-                Assert.All(tiles, t => Assert.Equal(StartBlue, ColourOf(t.Background)));
-            });
+        Inspect(ReceiveView, ReceiveProduct(inStock: true), tiles =>
+        {
+            Assert.NotEmpty(tiles);
+            Assert.All(tiles, t => Assert.Equal(StartBlue, ColourOf(t.Background)));
+        });
     }
 
     [Fact]
-    public void Every_Line_Of_Text_On_A_Sell_Tile_Is_White()
+    public void Every_Line_Of_Text_On_An_In_Stock_Tile_Is_White()
     {
-        Inspect(
-            () => new Views.SellView { DataContext = new SellViewModel(_services) },
-            view => ((SellViewModel)view.DataContext!).FilteredProducts
-                .Add(new ProductOption(1, "SKU-1", "منتج تجريبي")),
-            AssertNoDarkText);
+        // A TextBlock does not take its foreground from the button it sits in: repaint the tile
+        // blue and every unstyled line inside it stays dark. The receive tile also carries a badge
+        // class that was never defined anywhere in the project, so nothing was styling it at all.
+        Inspect(SellView, SellProduct(inStock: true), AssertAllWhite);
+        Inspect(ReceiveView, ReceiveProduct(inStock: true), AssertAllWhite);
+    }
+
+    // ---------- out of stock: the grey tile ----------
+
+    [Fact]
+    public void An_Out_Of_Stock_Tile_Is_Grey_But_Still_Readable()
+    {
+        // Repainting the tile exposed something the pale card had been hiding.
+        // Theme/Components.axaml fades every disabled tile to 0.55 opacity, which dark text on a
+        // pale card survived and grey-on-grey does not: out-of-stock products came out at about
+        // half strength, unreadable. So the fade is cancelled and the text goes dark.
+        //
+        // These rules have to be last in the collection. Avalonia resolves two rules that set the
+        // same property by order, not by specificity, and the catch-all placed after them wins
+        // silently -- which is exactly what the first attempt did.
+        Inspect(SellView, SellProduct(inStock: false), tiles =>
+        {
+            var tile = Assert.Single(tiles);
+            Assert.False(tile.IsEnabled);
+
+            Assert.Equal(1d, tile.Opacity);
+            Assert.Equal(EmptyGrey, ColourOf(tile.Background));
+
+            foreach (var text in tile.GetVisualDescendants().OfType<TextBlock>())
+                Assert.Equal(EmptyText, ColourOf(text.Foreground));
+        });
     }
 
     [Fact]
-    public void Every_Line_Of_Text_On_A_Receive_Tile_Is_White()
+    public void The_Receive_On_Hand_Figure_Has_A_Chip_Around_It()
     {
-        Inspect(
-            () => new Views.ReceiveView { DataContext = new ReceiveViewModel(_services) },
-            view => ((ReceiveViewModel)view.DataContext!).FilteredProducts
-                .Add(new ReceiveProductOption(1, "SKU-2", "صنف استلام")),
-            AssertNoDarkText);
+        // It was a bare number floating on the tile: the badge class it uses was never defined
+        // anywhere in the project, so nothing at all styled it and nothing said what it counted.
+        Inspect(ReceiveView, ReceiveProduct(inStock: true), tiles =>
+        {
+            var tile = Assert.Single(tiles);
+            var badge = tile.GetVisualDescendants()
+                .OfType<Border>()
+                .FirstOrDefault(b => b.Classes.Contains("info"));
+
+            Assert.NotNull(badge);
+            Assert.NotNull(badge!.Background);
+            Assert.NotEqual(Colors.Transparent, ColourOf(badge.Background));
+        });
     }
 
-    private static void AssertNoDarkText(Button[] tiles)
+    // ---------- shared assertion ----------
+
+    private static void AssertAllWhite(Button[] tiles)
     {
         Assert.NotEmpty(tiles);
 
