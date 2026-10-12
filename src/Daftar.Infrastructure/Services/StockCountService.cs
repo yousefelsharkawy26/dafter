@@ -120,6 +120,32 @@ public sealed class StockCountService(DaftarContext context)
                 context.StockBalances.Add(balance);
             }
 
+            // The variance says how much stock changed since the count was frozen, so it only
+            // means anything against the balance the counter was looking at. If the location has
+            // traded since then, applying it lands the stock somewhere neither the counter nor
+            // the ledger ever claimed: a sale of twenty taken while a count was open would be
+            // counted a second time as shrinkage.
+            //
+            // Nothing stops a location trading during a count -- there is no lock, whatever the
+            // comment on StockCount used to say -- so this is the only place the two can be
+            // compared. Refusing is the honest answer; the counter can be redone once the till is
+            // quiet, which takes minutes, whereas a wrong adjustment is found at stock-take.
+            //
+            // Read as a projection rather than off the balance above, and that is the point of
+            // this check: EF hands back the already-tracked entity for a query like the one above,
+            // so a context that has been alive since the snapshot would compare the snapshot with
+            // itself and call it a match. A projection always goes to the database.
+            var liveQuantity = await context.StockBalances
+                .Where(b => b.LotId == lot.Id && b.LocationId == count.LocationId)
+                .Select(b => (decimal?)b.Quantity)
+                .FirstOrDefaultAsync(cancellationToken) ?? 0m;
+
+            if (liveQuantity != item.SystemQty)
+                throw new DomainException(
+                    $"Lot {lot.Id} held {item.SystemQty} when the count started and holds "
+                    + $"{liveQuantity} now. Stock moved while the count was open, so its "
+                    + "difference no longer applies. Count again once the location is quiet.");
+
             balance.Apply(quantity, now);
 
             context.InventoryMovements.Add(new InventoryMovement

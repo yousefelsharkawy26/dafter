@@ -4,9 +4,16 @@ using Daftar.Domain.Shared;
 namespace Daftar.Domain.Inventory;
 
 /// <summary>
-/// A physical stock count. While it is a Draft the location is effectively locked: SystemQty is
-/// frozen at the moment counting starts, so later sales cannot silently change what the counter
-/// saw. Posting turns each variance into a CountAdjust movement.
+/// A physical stock count. SystemQty is frozen at the moment counting starts, so what the counter
+/// sees cannot drift underfoot. Posting turns each variance into a CountAdjust movement.
+///
+/// <para>
+/// The location is <b>not</b> locked, and an earlier version of this comment claimed it was. A
+/// sale can still post against the location while a count is open, which leaves the frozen
+/// difference describing a moment that has passed. <see cref="StockCountService"/> therefore
+/// refuses to post a variance whose lot has moved since the snapshot, rather than applying it to a
+/// balance it was never measured against.
+/// </para>
 /// </summary>
 public sealed class StockCount : IAuditable, IDomainValidatable
 {
@@ -68,8 +75,6 @@ public sealed class StockCount : IAuditable, IDomainValidatable
     [NotMapped]
     public IEnumerable<StockCountItem> Variances =>
         Items.Where(i => i.CountedQty.HasValue && i.DiffQty != 0m);
-
-    public decimal TotalVarianceValue(decimal lotCostOf) => Rounding.Amount(Variances.Sum(i => i.AbsDiff * lotCostOf));
 
     public void Post(string docNo, int userId, DateTime nowUtc)
     {
