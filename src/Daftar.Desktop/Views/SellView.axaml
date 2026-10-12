@@ -7,35 +7,53 @@
              FlowDirection="RightToLeft">
 
     <UserControl.Styles>
+        <!-- Product tile, in the Start button's blue.
+             These two screens override the shared tile style in Theme/Components.axaml, so the
+             palette is repeated here rather than inherited; both now point at the same three
+             values the Start button uses, so the shop reads as one family.
+
+             Every line of text inside the tile is set white. A TextBlock does not take its
+             foreground from the button, so without the catch-all below the SKU, the unit and the
+             on-hand figures stay dark navy on a dark blue background. The out-of-stock badge on
+             the receive tile has no style of its own at all, and the catch-all is what makes it
+             legible. -->
         <Style Selector="Button.tile">
-            <Setter Property="Background" Value="#F0F6FC" />
+            <Setter Property="Background" Value="#0078D7" />
             <Setter Property="BorderBrush" Value="#0078D7" />
-            <Setter Property="BorderThickness" Value="1.5" />
-            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="CornerRadius" Value="0" />
             <Setter Property="Padding" Value="12,10" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalContentAlignment" Value="Stretch" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
         <Style Selector="Button.tile:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#DDEBF7" />
-            <Setter Property="BorderBrush" Value="#005A9E" />
+            <Setter Property="Background" Value="#1A86E8" />
+            <Setter Property="TextBlock.Foreground" Value="White" />
         </Style>
         <Style Selector="Button.tile:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="#C5DFF4" />
-            <Setter Property="BorderBrush" Value="#004578" />
+            <Setter Property="Background" Value="#005A9E" />
+            <Setter Property="TextBlock.Foreground" Value="White" />
         </Style>
+        <!-- Out of stock stays pale. It is the one state that has to look different, and grey on
+             a blue grid reads as "not this one" faster than any label does. -->
         <Style Selector="Button.tile:disabled /template/ ContentPresenter">
-            <Setter Property="Background" Value="#F4F4F4" />
+            <Setter Property="Background" Value="#EDEDED" />
             <Setter Property="BorderBrush" Value="#D6D6D6" />
-            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="TextBlock.Foreground" Value="#7A7A7A" />
+            <Setter Property="Opacity" Value="0.9" />
+        </Style>
+        <Style Selector="Button.tile TextBlock">
+            <Setter Property="Foreground" Value="White" />
         </Style>
         <Style Selector="Button.tile TextBlock.strong">
-            <Setter Property="Foreground" Value="#0A3663" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="Bold" />
         </Style>
         <Style Selector="Button.tile TextBlock.price">
-            <Setter Property="Foreground" Value="#0078D7" />
+            <Setter Property="Foreground" Value="White" />
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
     </UserControl.Styles>
@@ -151,7 +169,6 @@
                                                       Padding="6,1" Margin="0,2,0,0" />
                                             <TextBlock Text="{Binding UnitName, StringFormat='({0})'}"
                                                        Classes="caption"
-                                                       Foreground="#0078D7"
                                                        FontWeight="SemiBold"
                                                        Margin="0,2,0,0"
                                                        HorizontalAlignment="Center"
