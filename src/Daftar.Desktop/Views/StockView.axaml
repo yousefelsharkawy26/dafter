@@ -29,7 +29,11 @@
                         </StackPanel>
                     </Button>
 
-                    <Button Grid.Column="2" Classes="accent" Command="{Binding ToggleTransferPanelCommand}">
+                    <!-- Parked, not deleted. See StockViewModel.StockTransferEnabled. -->
+                    <Button Grid.Column="2" x:Name="TransferButton" Classes="accent"
+                            Command="{Binding ToggleTransferPanelCommand}"
+                            IsVisible="{Binding IsStockTransferEnabled}"
+                            IsEnabled="{Binding IsStockTransferEnabled}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="🔄" FontSize="14" VerticalAlignment="Center" />
                             <TextBlock Text="تحويل مخزون (نقل / تحميل)" FontWeight="Bold" VerticalAlignment="Center" />
@@ -329,10 +333,11 @@
                                                 </StackPanel>
                                             </Button>
 
-                                            <!-- Direct Transfer Button -->
+                                            <!-- Direct Transfer Button. Parked with the rest. -->
                                             <Button Classes="ghost" Padding="8,4"
                                                     Command="{Binding $parent[UserControl].((vm:StockViewModel)DataContext).OpenTransferForStockCommand}"
                                                     CommandParameter="{Binding}"
+                                                    IsVisible="{Binding $parent[UserControl].((vm:StockViewModel)DataContext).IsStockTransferEnabled}"
                                                     ToolTip.Tip="تحويل رصيد هذا الصنف">
                                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                                     <TextBlock Text="🔄" FontSize="11" />

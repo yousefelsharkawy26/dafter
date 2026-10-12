@@ -354,9 +354,33 @@ public partial class StockViewModel(IServiceProvider services) : ObservableObjec
         ShowTrackingTab();
     }
 
+    /// <summary>
+    /// Stock transfer is switched off for now. Nothing was wrong with it; it is parked, not
+    /// broken, and the code below is intact for when it comes back.
+    /// </summary>
+    /// <remarks>
+    /// One constant, so turning it on again is a single edit rather than a hunt through the view.
+    /// Both entry points read it — the header button and the per-row one — and so do the commands
+    /// behind them, so hiding the buttons is not the only thing standing between an operator and
+    /// a transfer. Anything bound to <c>IsVisible</c> alone can still be reached from a keyboard
+    /// shortcut or a stale binding; this cannot.
+    /// </remarks>
+    /// <remarks>
+    /// Deliberately not a <c>const</c>: with a constant the compiler can see the guard is always
+    /// taken, and reports the parked code below as unreachable. Two warnings on every build for a
+    /// switch that is meant to be flipped back is the wrong trade.
+    /// </remarks>
+    public static readonly bool StockTransferEnabled = false;
+
+    public bool IsStockTransferEnabled => StockTransferEnabled;
+
     [RelayCommand]
+    /// <summary>Opens the transfer dialog for one row. Refused while the feature is parked.</summary>
     public void OpenTransferForStock(StockRow row)
     {
+        if (!StockTransferEnabled)
+            return;
+
         IsTransferPanelOpen = true;
         TransferError = string.Empty;
         TransferSuccess = string.Empty;
@@ -398,8 +422,12 @@ public partial class StockViewModel(IServiceProvider services) : ObservableObjec
     }
 
     [RelayCommand]
+    /// <summary>Shows or hides the transfer dialog. Refused while the feature is parked.</summary>
     public void ToggleTransferPanel()
     {
+        if (!StockTransferEnabled)
+            return;
+
         IsTransferPanelOpen = !IsTransferPanelOpen;
         TransferError = string.Empty;
         TransferSuccess = string.Empty;
