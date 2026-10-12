@@ -236,7 +236,7 @@
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
                               GridLinesVisibility="Horizontal"
-                              RowHeight="44">
+                              RowHeight="52">
                         <DataGrid.Columns>
                             <!-- Product Name & Code -->
                             <DataGridTemplateColumn Header="الصنف والكود" Width="2.5*">
@@ -363,7 +363,7 @@
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
                               GridLinesVisibility="Horizontal"
-                              RowHeight="44">
+                              RowHeight="52">
                         <DataGrid.Columns>
                             <!-- Date & Time -->
                             <DataGridTemplateColumn Header="التاريخ والوقت" Width="140">

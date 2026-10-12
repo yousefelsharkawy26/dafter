@@ -71,8 +71,13 @@ public sealed class SaleReturnService(DaftarContext context)
             DocDate = businessDate,
             Notes = notes ?? $"Return against {original.DocNo}",
         };
+        // Added but deliberately not saved yet. Saving the draft here and saving it again at the
+        // end looked harmless and was not: everything below can refuse -- a line whose product or
+        // unit has gone, or a fully-returned invoice -- and a refusal after the first save left an
+        // empty return in the sales table. Nothing in the loop needs the assigned id, so the whole
+        // draft is built in memory and written once, which makes a half-written return
+        // impossible rather than merely unlikely.
         context.Sales.Add(returnSale);
-        await context.SaveChangesAsync(cancellationToken);
 
         var mirrored = new List<ReturnedLine>();
 

@@ -290,6 +290,14 @@ public sealed class PriceReturnsAndIntegrityTests : IAsyncLifetime, IDisposable
 
         await Assert.ThrowsAsync<DomainException>(
             () => returns.BeginAsync(sold.SaleId, Today, userId: 1));
+
+        // Refusing is only half of it. The draft is written before the service works out that
+        // there is nothing left to give back, so a refused return used to leave an empty return
+        // sitting in the sales table -- no items, no number, invisible to every report, and one
+        // more for each time anyone tried.
+        Assert.Empty(await NewContext().Sales
+            .Where(s => s.Type == SaleType.Return && s.Status == DocumentStatus.Draft)
+            .ToListAsync());
     }
 
     [Fact]
