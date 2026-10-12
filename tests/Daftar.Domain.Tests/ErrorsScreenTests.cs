@@ -4,7 +4,9 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
 using Daftar.Desktop.Diagnostics;
+using Daftar.Infrastructure;
 using Daftar.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Daftar.Domain.Tests;
@@ -190,6 +192,53 @@ public sealed class ErrorsScreenTests
             Assert.Contains("database is locked", TextIn(view), StringComparison.Ordinal);
         });
     }
+
+    // ---------- where it lives ----------
+
+    [Fact]
+    public void It_Is_A_Section_Of_Settings_And_Not_A_Page_Of_Its_Own()
+    {
+        // It was first given a launcher button, which put a diagnostic one click away from every
+        // operator for a page nobody opens on purpose. It belongs inside settings, where the other
+        // things nobody opens on purpose already are.
+        var launcher = new MainWindowViewModel().Launcher;
+
+        Assert.DoesNotContain(launcher, b => b.Key.Contains("errors"));
+        Assert.DoesNotContain("الأخطاء", launcher.Select(b => b.Title));
+        Assert.Contains(launcher, b => b.Key == TabKeys.Settings);
+    }
+
+    [Fact]
+    public void Settings_Carries_The_Log_And_Can_Switch_To_Its_Section()
+    {
+        var vm = new SettingsViewModel(Services());
+
+        Assert.NotNull(vm.Errors);
+        Assert.False(vm.IsErrorsSectionActive);
+
+        vm.SelectErrorsSection();
+
+        Assert.True(vm.IsErrorsSectionActive);
+    }
+
+    [Fact]
+    public void Opening_Another_Section_Leaves_The_Log_Section()
+    {
+        // The sections are indexes, so one leaving means another taking over. A log pane that
+        // stayed up over the backup settings would be two screens at once.
+        var vm = new SettingsViewModel(Services());
+
+        vm.SelectErrorsSection();
+        vm.SelectBackupSection();
+
+        Assert.False(vm.IsErrorsSectionActive);
+        Assert.True(vm.IsBackupSectionActive);
+    }
+
+    private static IServiceProvider Services() =>
+        new ServiceCollection()
+            .AddDaftarPersistence(Path.Combine(Path.GetTempPath(), "daftar-settings-unused.db"))
+            .BuildServiceProvider();
 
     private static string TextIn(Control root) =>
         string.Join('\n', root.GetVisualDescendants()

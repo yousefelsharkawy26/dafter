@@ -60,17 +60,27 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
     private readonly IServiceProvider _services = services;
 
     // ── Navigation Section ────────────────────────────────────────────────────
-    [ObservableProperty] private int _selectedSectionIndex; // 0=Company, 1=Users, 2=Roles, 3=Backup
+    [ObservableProperty] private int _selectedSectionIndex; // 0=Company, 1=Users, 2=Roles, 3=Backup, 4=Errors
 
     public bool IsCompanySectionActive => SelectedSectionIndex == 0;
     public bool IsUsersSectionActive => SelectedSectionIndex == 1;
     public bool IsRolesSectionActive => SelectedSectionIndex == 2;
     public bool IsBackupSectionActive => SelectedSectionIndex == 3;
+    public bool IsErrorsSectionActive => SelectedSectionIndex == 4;
+
+    /// <summary>
+    /// The error log, hosted here rather than given a tab of its own. Nothing on this screen is a
+    /// day-to-day task, so putting it in the launcher offered every operator a button for a page
+    /// they would never want; a section inside settings is where a diagnostic belongs, and it
+    /// inherits the settings permission instead of needing one of its own.
+    /// </summary>
+    public ErrorsViewModel Errors { get; } = new();
 
     [RelayCommand] public void SelectCompanySection() => SelectedSectionIndex = 0;
     [RelayCommand] public void SelectUsersSection() => SelectedSectionIndex = 1;
     [RelayCommand] public void SelectRolesSection() => SelectedSectionIndex = 2;
     [RelayCommand] public void SelectBackupSection() => SelectedSectionIndex = 3;
+    [RelayCommand] public void SelectErrorsSection() => SelectedSectionIndex = 4;
 
     partial void OnSelectedSectionIndexChanged(int value)
     {
@@ -78,6 +88,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
         OnPropertyChanged(nameof(IsUsersSectionActive));
         OnPropertyChanged(nameof(IsRolesSectionActive));
         OnPropertyChanged(nameof(IsBackupSectionActive));
+        OnPropertyChanged(nameof(IsErrorsSectionActive));
 
         if (value == 3)
             RefreshBackups();

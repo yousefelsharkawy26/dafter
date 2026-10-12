@@ -62,13 +62,12 @@ public static class TabKeys
     public const string Sessions = "sessions";
     public const string Reports = "reports";
     public const string Settings = "settings";
-    public const string Errors = "errors";
 
     /// <summary>Launcher strip order, right to left.</summary>
     public static readonly string[] Order =
     [
         Sell, Receive, Returns, Products, Stock,
-        Payments, Parties, Sessions, Reports, Settings, Errors,
+        Payments, Parties, Sessions, Reports, Settings,
     ];
 
     public static string TitleFor(string key) => key switch
@@ -84,7 +83,6 @@ public static class TabKeys
         Sessions => "الموزعين",
         Reports => "التقارير",
         Settings => "الإعدادات",
-        Errors => "الأخطاء",
         _ => key,
     };
 
@@ -100,7 +98,6 @@ public static class TabKeys
         Sessions => "🚚",
         Reports => "📈",
         Settings => "⚙️",
-        Errors => "⚠️",
         _ => "📄",
     };
 }

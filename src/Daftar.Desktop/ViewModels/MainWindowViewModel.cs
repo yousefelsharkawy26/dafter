@@ -74,10 +74,6 @@ public partial class MainWindowViewModel : ObservableObject
             [TabKeys.Settings] = new(TabKeys.Settings, TabKeys.TitleFor(TabKeys.Settings),
                 typeof(SettingsView), typeof(SettingsViewModel),
                 "بيانات الشركة والفواتير"),
-
-            [TabKeys.Errors] = new(TabKeys.Errors, TabKeys.TitleFor(TabKeys.Errors),
-                typeof(ErrorsView), typeof(ErrorsViewModel),
-                "أخطاء النظام التي منعته من إتمام عملية"),
         };
 
         Launcher = TabKeys.Order
@@ -102,9 +98,6 @@ public partial class MainWindowViewModel : ObservableObject
     {
         [TabKeys.Settings] = Domain.Security.Role.Codes.UsersManage,
         [TabKeys.Products] = Domain.Security.Role.Codes.PriceOverride,
-        // The log carries exception text: file paths, and whatever the database had in the query.
-        // Nothing here belongs to a cashier, and a cashier cannot act on it either.
-        [TabKeys.Errors] = Domain.Security.Role.Codes.UsersManage,
     };
 
     /// <summary>

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
+             xmlns:views="using:Daftar.Views"
              x:Class="Daftar.Views.SettingsView"
              x:DataType="vm:SettingsViewModel"
              FlowDirection="RightToLeft">
@@ -58,6 +59,14 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="💾" FontSize="14" VerticalAlignment="Center" />
                         <TextBlock Text="النسخ الاحتياطي والأمان" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="tab-btn" Classes.accent="{Binding IsErrorsSectionActive}"
+                        Command="{Binding SelectErrorsSectionCommand}" Padding="16,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="⚠️" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock Text="سجل الأخطاء" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
             </StackPanel>
@@ -316,6 +325,17 @@
                     </Border>
                 </StackPanel>
             </ScrollViewer>
+
+            <!-- ── SECTION 4: Error Log ────────────────────────────────
+                 The real view, hosted rather than copied, so it keeps its
+                 own layout and its own load-on-open.
+
+                 The visibility sits on the wrapper because the child
+                 declares its own x:DataType, which is what its inherited
+                 bindings would then be compiled against. -->
+            <Panel IsVisible="{Binding IsErrorsSectionActive}">
+                <views:ErrorsView DataContext="{Binding Errors}" />
+            </Panel>
 
         </Panel>
 
