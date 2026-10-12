@@ -44,6 +44,10 @@ public sealed class PaymentPostingService(DaftarContext context)
         DateOnly? businessDate,
         CancellationToken cancellationToken)
     {
+        // Stamped with whoever is signed in, not with whatever the caller passed: every
+        // call site in the app was passing a literal 1, so every document recorded the seeded
+        // admin as the one who posted it while the audit log named the real operator.
+        userId = context.PostingActor(userId);
         var payment = await context.Payments
             .FirstOrDefaultAsync(p => p.Id == paymentId, cancellationToken)
             ?? throw new DomainException($"Payment {paymentId} does not exist.");

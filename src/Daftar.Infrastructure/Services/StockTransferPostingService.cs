@@ -42,6 +42,10 @@ public sealed class StockTransferPostingService(DaftarContext context)
         DateOnly? businessDate,
         CancellationToken cancellationToken)
     {
+        // Stamped with whoever is signed in, not with whatever the caller passed: every
+        // call site in the app was passing a literal 1, so every document recorded the seeded
+        // admin as the one who posted it while the audit log named the real operator.
+        userId = context.PostingActor(userId);
         var transfer = await context.StockTransfers
             .Include(t => t.Items)
             .FirstOrDefaultAsync(t => t.Id == transferId, cancellationToken)

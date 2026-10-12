@@ -91,6 +91,11 @@ public sealed class StockCountService(DaftarContext context)
         int userId,
         CancellationToken cancellationToken)
     {
+        // Stamped with whoever is signed in, not with whatever the caller passed: every
+        // call site in the app was passing a literal 1, so every document recorded the seeded
+        // admin as the one who posted it while the audit log named the real operator.
+        userId = context.PostingActor(userId);
+
         var count = await context.StockCounts
             .Include(c => c.Items)
             .FirstOrDefaultAsync(c => c.Id == countId, cancellationToken)

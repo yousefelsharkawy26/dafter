@@ -47,6 +47,10 @@ public sealed class DistributorSessionService(
         // down, all from one call. Without this anyone who could reach it could close a session.
         context.RequirePermission(Daftar.Domain.Security.Role.Codes.PaymentsManage);
 
+        // Same reason as the posting services: who opened the session is a fact about the shop,
+        // and the caller passing a constant is how it came to be wrong for everything else.
+        userId = context.PostingActor(userId);
+
         var alreadyOpen = await context.DistributorSessions
             .AnyAsync(s => s.DistributorId == distributorId && s.Status == DistributorSessionStatus.Open, cancellationToken);
 
@@ -190,6 +194,9 @@ public sealed class DistributorSessionService(
         int userId,
         CancellationToken cancellationToken)
     {
+        // Who closed it is part of the settlement record, and the caller passes a constant.
+        userId = context.PostingActor(userId);
+
         var session = await context.DistributorSessions
             .FirstOrDefaultAsync(s => s.Id == sessionId, cancellationToken)
             ?? throw new DomainException($"Session {sessionId} does not exist.");

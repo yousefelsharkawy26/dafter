@@ -23,6 +23,30 @@ public sealed class DaftarContext(DbContextOptions<DaftarContext> options) : DbC
     internal int? SignedInUserId => CurrentUserIdentity.Value?.UserId;
 
     /// <summary>
+    /// Who a posting should be stamped with: the signed-in operator when there is one, and
+    /// whatever the caller passed otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Every posting service was being called with a literal userId of 1, from sixteen call sites
+    /// across six view models, so every document in the shop recorded that the seeded admin posted
+    /// it. The audit interceptor already stamped the right user onto <c>CreatedBy</c> from the same
+    /// ambient identity, which is why the two disagreed and neither looked broken.
+    ///
+    /// <para>
+    /// Resolving it here rather than at each call site is the point: a caller that forgets to pass
+    /// the right id is now harmless, where fixing the sixteen call sites would have left the next
+    /// screen free to get it wrong again.
+    /// </para>
+    ///
+    /// <para>
+    /// The fallback is what keeps seeding, migrations and the tests working, all of which post
+    /// with nobody signed in. Zero already means "unknown" to the interceptor, so a genuine
+    /// nobody-signed-in still reads as unknown rather than as a person.
+    /// </para>
+    /// </remarks>
+    internal int PostingActor(int callerSupplied) => SignedInUserId ?? callerSupplied;
+
+    /// <summary>
     /// Throws unless the signed-in role holds the code. Called by the posting services before they
     /// move stock or money, so a screen that forgets to check still cannot perform the operation.
     /// A no-op when nobody is signed in, because seeding and migrations write through here.
