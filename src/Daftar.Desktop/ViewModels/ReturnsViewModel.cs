@@ -403,7 +403,7 @@ public partial class ReturnsViewModel(IServiceProvider services) : ObservableObj
             if (CandidateInvoices.Count == 0)
                 CreateStatusMessage = "لم يتم العثور على فواتير مطابقة للبحث";
             else
-                CreateStatusMessage = $"تم العثور على {CandidateInvoices.Count} فاتورة";
+                CreateStatusMessage = $"تم العثور على {ArabicText.Count(CandidateInvoices.Count, "فاتورة", "فاتورتان", "فواتير")}";
         }
         catch (Exception ex)
         {
@@ -481,7 +481,7 @@ public partial class ReturnsViewModel(IServiceProvider services) : ObservableObj
             }
 
             RecalculateRefundTotal();
-            CreateStatusMessage = $"تم تحميل {ReturnCandidateLines.Count} بند من الفاتورة {candidate.DocNo}";
+            CreateStatusMessage = $"تم تحميل {ArabicText.Count(ReturnCandidateLines.Count, "بند", "بندان", "بنود")} من الفاتورة {candidate.DocNo}";
         }
         catch (Exception ex)
         {

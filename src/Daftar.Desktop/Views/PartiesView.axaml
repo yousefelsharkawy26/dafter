@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
+             xmlns:components="using:Daftar.Views.Components"
              x:Class="Daftar.Views.PartiesView"
              x:DataType="vm:PartiesViewModel"
              FlowDirection="RightToLeft">
@@ -173,153 +174,84 @@
             </Border>
         </Grid>
 
-        <!-- Floating Modal Dialog Overlay (إضافة / تعديل طرف) -->
-        <Grid Grid.Row="0" Grid.RowSpan="2"
-              IsVisible="{Binding IsPartyDialogOpen}"
-              ZIndex="1000">
+        <components:ModalDialog IsVisible="{Binding IsPartyDialogOpen}"
+                             Title="{Binding DialogTitle}"
+                             Subtitle="أدخل بيانات العميل أو المورد ثم اضغط حفظ"
+                             CloseCommand="{Binding ClosePartyDialogCommand}"
+                             BackdropCloses="True"
+                             DialogWidth="520"
+                             ZIndex="1000">
 
-            <!-- Backdrop: closes dialog on click -->
-            <Button Command="{Binding ClosePartyDialogCommand}"
-                    Background="#77000000"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Padding="0"
-                    BorderThickness="0"
-                    CornerRadius="0" />
+            <components:ModalDialog.Body>
+                <StackPanel Spacing="14">
+                    <!-- Name -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="الاسم *" Classes="caption muted" />
+                        <TextBox Text="{Binding FormName, Mode=TwoWay}"
+                                 PlaceholderText="اسم العميل أو المورد"
+                                 Height="38" VerticalContentAlignment="Center" />
+                    </StackPanel>
 
-            <!-- Centered Modal Card -->
-            <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
-                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="10"
-                    Width="520"
-                    Margin="20"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    BoxShadow="0 14 40 0 #66000000">
-                <Grid RowDefinitions="Auto,*,Auto">
-                    <!-- Dialog Header -->
-                    <Border Grid.Row="0"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="0,0,0,1"
-                            CornerRadius="10,10,0,0"
-                            Padding="20,14">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Grid.Column="0" Spacing="2">
-                                <TextBlock Text="{Binding DialogTitle}"
-                                           Classes="subtitle" FontWeight="Bold" />
-                                <TextBlock Text="أدخل بيانات العميل أو المورد ثم اضغط حفظ"
-                                           Classes="caption muted" />
-                            </StackPanel>
-                            <Button Grid.Column="1"
-                                    Classes="ghost"
-                                    Command="{Binding ClosePartyDialogCommand}"
-                                    Width="34" Height="34"
-                                    HorizontalContentAlignment="Center"
-                                    VerticalContentAlignment="Center"
-                                    FontSize="15" FontWeight="Bold"
-                                    ToolTip.Tip="إغلاق">
-                                <TextBlock Text="✕" />
-                            </Button>
-                        </Grid>
-                    </Border>
-
-                    <!-- Dialog Body -->
-                    <ScrollViewer Grid.Row="1" Padding="20,16" MaxHeight="460">
-                        <StackPanel Spacing="14">
-                            <!-- Name -->
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="الاسم *" Classes="caption muted" />
-                                <TextBox Text="{Binding FormName, Mode=TwoWay}"
-                                         PlaceholderText="اسم العميل أو المورد"
-                                         Height="38" VerticalContentAlignment="Center" />
-                            </StackPanel>
-
-                            <!-- Phone and Code -->
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                                <StackPanel Grid.Column="0" Spacing="4">
-                                    <TextBlock Text="رقم الهاتف" Classes="caption muted" />
-                                    <TextBox Text="{Binding FormPhone, Mode=TwoWay}"
-                                             PlaceholderText="01xxxxxxxxx"
-                                             Height="38" VerticalContentAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="4">
-                                    <TextBlock Text="الكود" Classes="caption muted" />
-                                    <TextBox Text="{Binding FormCode, Mode=TwoWay}"
-                                             PlaceholderText="تلقائي إذا ترك فارغاً"
-                                             Height="38" VerticalContentAlignment="Center" />
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Address and Tax Number -->
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                                <StackPanel Grid.Column="0" Spacing="4">
-                                    <TextBlock Text="العنوان أو المنطقة" Classes="caption muted" />
-                                    <TextBox Text="{Binding FormAddress, Mode=TwoWay}"
-                                             PlaceholderText="العنوان بالتفصيل"
-                                             Height="38" VerticalContentAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="4">
-                                    <TextBlock Text="الرقم الضريبي (اختياري)" Classes="caption muted" />
-                                    <TextBox Text="{Binding FormTaxNumber, Mode=TwoWay}"
-                                             PlaceholderText="الرقم الضريبي"
-                                             Height="38" VerticalContentAlignment="Center" />
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Party Role (Customer / Supplier checkboxes) -->
-                            <StackPanel Spacing="6">
-                                <TextBlock Text="نوع الطرف *" Classes="caption muted" />
-                                <StackPanel Orientation="Horizontal" Spacing="24">
-                                    <CheckBox IsChecked="{Binding FormIsCustomer, Mode=TwoWay}" Content="عميل" />
-                                    <CheckBox IsChecked="{Binding FormIsSupplier, Mode=TwoWay}" Content="مورد" />
-                                </StackPanel>
-                            </StackPanel>
-
-                            <!-- Credit Limit -->
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="حد الائتمان (0 = نقدي فقط بدون آجل)" Classes="caption muted" />
-                                <TextBox Text="{Binding FormCreditLimit, Mode=TwoWay}"
-                                         PlaceholderText="0.00"
-                                         Height="38" VerticalContentAlignment="Center" />
-                            </StackPanel>
-
-                            <!-- Error Message -->
-                            <TextBlock Text="{Binding DialogErrorMessage}"
-                                       Classes="caption danger"
-                                       IsVisible="{Binding DialogErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <!-- Phone and Code -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="رقم الهاتف" Classes="caption muted" />
+                            <TextBox Text="{Binding FormPhone, Mode=TwoWay}"
+                                     PlaceholderText="01xxxxxxxxx"
+                                     Height="38" VerticalContentAlignment="Center" />
                         </StackPanel>
-                    </ScrollViewer>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="الكود" Classes="caption muted" />
+                            <TextBox Text="{Binding FormCode, Mode=TwoWay}"
+                                     PlaceholderText="تلقائي إذا ترك فارغاً"
+                                     Height="38" VerticalContentAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
 
-                    <!-- Dialog Footer -->
-                    <Border Grid.Row="2"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="0,1,0,0"
-                            CornerRadius="0,0,10,10"
-                            Padding="16,12">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                            <ProgressBar Grid.Column="0" IsIndeterminate="True"
-                                         IsVisible="{Binding IsBusy}" VerticalAlignment="Center" Height="4" />
+                    <!-- Address and Tax Number -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="العنوان أو المنطقة" Classes="caption muted" />
+                            <TextBox Text="{Binding FormAddress, Mode=TwoWay}"
+                                     PlaceholderText="العنوان بالتفصيل"
+                                     Height="38" VerticalContentAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="الرقم الضريبي (اختياري)" Classes="caption muted" />
+                            <TextBox Text="{Binding FormTaxNumber, Mode=TwoWay}"
+                                     PlaceholderText="الرقم الضريبي"
+                                     Height="38" VerticalContentAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
 
-                            <Button Grid.Column="1" Classes="ghost" Content="إلغاء"
-                                    Command="{Binding ClosePartyDialogCommand}"
-                                    Padding="16,6" Height="36" />
+                    <!-- Party Role (Customer / Supplier checkboxes) -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="نوع الطرف *" Classes="caption muted" />
+                        <StackPanel Orientation="Horizontal" Spacing="24">
+                            <CheckBox IsChecked="{Binding FormIsCustomer, Mode=TwoWay}" Content="عميل" />
+                            <CheckBox IsChecked="{Binding FormIsSupplier, Mode=TwoWay}" Content="مورد" />
+                        </StackPanel>
+                    </StackPanel>
 
-                            <Button Grid.Column="2" Classes="accent"
-                                    Command="{Binding SavePartyCommand}"
-                                    Padding="20,6" Height="36">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <TextBlock Text="✓" FontWeight="Bold" />
-                                    <TextBlock Text="{Binding SaveButtonText}" FontWeight="Bold" />
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </Border>
-        </Grid>
+                    <!-- Credit Limit -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="حد الائتمان (0 = نقدي فقط بدون آجل)" Classes="caption muted" />
+                        <TextBox Text="{Binding FormCreditLimit, Mode=TwoWay}"
+                                 PlaceholderText="0.00"
+                                 Height="38" VerticalContentAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Error Message -->
+                    <TextBlock Text="{Binding DialogErrorMessage}"
+                               Classes="caption danger"
+                               IsVisible="{Binding DialogErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+            </components:ModalDialog.Body>
+
+            <components:ModalDialog.Footer>
+                <components:DialogActions IsBusy="{Binding IsBusy}" CancelCommand="{Binding ClosePartyDialogCommand}" SaveCommand="{Binding SavePartyCommand}" SaveText="{Binding SaveButtonText}" />
+            </components:ModalDialog.Footer>
+        </components:ModalDialog>
 
     </Grid>
 </UserControl>

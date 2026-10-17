@@ -251,7 +251,15 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
 
     public ObservableCollection<ReceiveProductOption> Products { get; } = [];
 
-    public ObservableCollection<ReceiveProductOption> FilteredProducts { get; } = [];
+    /// <summary>
+    /// Tiles, not options: this is the list the shared ProductTileGrid renders, and it is the only
+    /// one the view sees. Tiles are built once per product at load and filtering re-picks them, so
+    /// typing in the search box allocates nothing.
+    /// </summary>
+    public ObservableCollection<ProductTileItem> FilteredProducts { get; } = [];
+
+    /// <summary>One tile per product id, so ApplyProductFilter reuses rather than rebuilds.</summary>
+    private readonly Dictionary<int, ProductTileItem> _tilesByProductId = new();
 
     public ObservableCollection<ReceiveLine> Lines { get; } = [];
 
@@ -312,7 +320,7 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
             ? "مفيش مخزن — أضف مخزن من الإعدادات"
             : Suppliers.Count == 0
                 ? "مفيش موردين — أضفهم من شاشة الأطراف"
-                : $"{Suppliers.Count} مورد جاهز للاستلام";
+                : $"{ArabicText.Count(Suppliers.Count, "مورد جاهز للاستلام", "موردان جاهزان للاستلام", "موردون جاهزون للاستلام")}";
 
         await ReloadProductsAsync(ctx);
         await FillInvoiceNoAsync(ctx);
@@ -394,9 +402,36 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
                                ?? option.AvailableUnits.FirstOrDefault();
 
             Products.Add(option);
+
+            // The tile copies the units rather than sharing them, so a unit picked in the grid has
+            // to be written back to the option the invoice line reads.
+            _tilesByProductId[option.ProductId] = new ProductTileItem(
+                source: option,
+                productId: option.ProductId,
+                sku: option.Sku,
+                name: option.Name,
+                variant: ProductTileVariant.Receive,
+                units: option.AvailableUnits.Select(ToTileUnit),
+                priceFormatter: u => u.PurchasePrice > 0 ? $"{u.PurchasePrice:N2} ج.م" : "سعر غير محدد",
+                unitSelected: u => option.SelectedUnit =
+                    option.AvailableUnits.FirstOrDefault(x => x.ProductUnitId == u.ProductUnitId),
+                selectCommand: SelectTileCommand);
         }
 
         ApplyProductFilter();
+    }
+
+    private static ProductTileUnit ToTileUnit(ReceiveUnitOption u) =>
+        new(u.ProductUnitId, u.UnitName, u.UnitFactor, 0m, u.PurchasePrice, u.OnHand);
+
+    /// <summary>Runs when a tile is tapped. Resolves back to the option and reuses the existing path.</summary>
+    [RelayCommand]
+    private void SelectTile(ProductTileItem? tile)
+    {
+        if (tile?.Source is ReceiveProductOption option)
+        {
+            SelectProduct(option);
+        }
     }
 
     partial void OnProductSearchTextChanged(string value) => ApplyProductFilter();
@@ -412,7 +447,7 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
                 || p.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
                 || p.Sku.Contains(search, StringComparison.OrdinalIgnoreCase))
             {
-                FilteredProducts.Add(p);
+                FilteredProducts.Add(_tilesByProductId[p.ProductId]);
             }
         }
     }
@@ -423,10 +458,13 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
         if (string.IsNullOrWhiteSpace(ProductSearchText)) return;
 
         var search = ProductSearchText.Trim();
+        // The last fallback is "whatever the search box left visible", which is what
+        // ApplyProductFilter keeps, spelled out rather than read back off the displayed list.
         var match = Products.FirstOrDefault(p => string.Equals(p.Sku, search, StringComparison.OrdinalIgnoreCase))
-                    ?? FilteredProducts.FirstOrDefault(p => string.Equals(p.Sku, search, StringComparison.OrdinalIgnoreCase))
                     ?? Products.FirstOrDefault(p => string.Equals(p.Name, search, StringComparison.OrdinalIgnoreCase))
-                    ?? FilteredProducts.FirstOrDefault();
+                    ?? Products.FirstOrDefault(p =>
+                            p.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                            || p.Sku.Contains(search, StringComparison.OrdinalIgnoreCase));
 
         if (match is not null)
         {
@@ -756,7 +794,7 @@ public partial class ReceiveViewModel(IServiceProvider services) : ObservableObj
                     ? "آجل"
                     : $"مدفوع {DashboardViewModel.Money(Settlement.AmountFor(purchase.Total))}";
 
-                Status = $"تم الاستلام — {result.DocNo} · {postedLines} سطر · {paid} · الإجمالي {DashboardViewModel.Money(Total)}";
+                Status = $"تم الاستلام — {result.DocNo} · {ArabicText.Count(postedLines, "سطر", "سطران", "أسطر")} · {paid} · الإجمالي {DashboardViewModel.Money(Total)}";
 
                 Lines.Clear();
                 InvoiceNo = string.Empty;

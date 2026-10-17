@@ -1,0 +1,130 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Daftar.ViewModels"
+             x:Class="Daftar.Views.Components.ProductTileView"
+             x:DataType="vm:ProductTileItem"
+             FlowDirection="RightToLeft">
+
+    <!--
+        One product square, for both the sell and receive screens.
+
+        The markup used to exist twice, once per screen, and the copies drifted. The colour rules
+        are not here: they belong to Button.tile in Theme/Components.axaml, so a tile can be restyled
+        in one place. What is here is the layout and which parts each variant shows.
+
+        Nothing binds to the surrounding screen. SelectCommand and AddCommand arrive on the item, so
+        the same control serves both without knowing what is on the other side of it.
+    -->
+    <Button Classes="tile"
+            Command="{Binding SelectCommand}"
+            CommandParameter="{Binding}"
+            IsEnabled="{Binding HasStock}">
+
+        <ToolTip.Tip>
+            <TextBlock Text="{Binding ToolTipText}"
+                       Classes="strong"
+                       TextWrapping="Wrap"
+                       MaxWidth="250"
+                       Foreground="#333333" />
+        </ToolTip.Tip>
+
+        <Grid RowDefinitions="Auto,*,Auto">
+
+            <!-- ── SKU + the one flag that differs ────────────────── -->
+            <Grid Grid.Row="0" ColumnSpacing="{StaticResource SpaceSm}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="{Binding Sku}"
+                           Classes="caption"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" />
+
+                <!-- Selling: low, and gone. Two different problems, two different colours. -->
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="{StaticResource SpaceXs}"
+                            IsVisible="{Binding ShowsStockWarnings}">
+                    <Border Classes="badge warning" IsVisible="{Binding IsLowStock}">
+                        <TextBlock Text="مخزون منخفض" />
+                    </Border>
+                    <Border Classes="badge danger" IsVisible="{Binding !HasStock}">
+                        <TextBlock Text="نفد المخزون" />
+                    </Border>
+                </StackPanel>
+
+                <!-- Receiving: what is already on the shelf. -->
+                <Border Grid.Column="1"
+                        Classes="badge info"
+                        IsVisible="{Binding ShowsOnHandChip}">
+                    <TextBlock Text="{Binding OnHandText}" FontSize="11" />
+                </Border>
+            </Grid>
+
+            <!-- ── Name + unit picker ──────────────────────────────── -->
+            <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,3">
+                <TextBlock Text="{Binding Name}"
+                           Classes="strong"
+                           TextWrapping="Wrap"
+                           MaxLines="2"
+                           TextTrimming="CharacterEllipsis" />
+
+                <ComboBox ItemsSource="{Binding Units}"
+                          SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
+                          DisplayMemberBinding="{Binding UnitName}"
+                          IsVisible="{Binding HasMultipleUnits}"
+                          HorizontalAlignment="Center"
+                          MinHeight="24" Height="24" FontSize="11"
+                          Padding="6,1" Margin="0,2,0,0"
+                          ToolTip.Tip="اختيار الوحدة" />
+
+                <!-- No Foreground here. An inline setter beats every style rule, so writing
+                     "white" onto this line is what left it white on an out-of-stock tile: the
+                     disabled rule below cannot reach past it. Button.tile TextBlock already makes
+                     it white when the tile is normal. -->
+                <TextBlock Text="{Binding UnitName, StringFormat='({0})'}"
+                           Classes="caption"
+                           FontWeight="SemiBold"
+                           Margin="0,2,0,0"
+                           HorizontalAlignment="Center"
+                           IsVisible="{Binding !HasMultipleUnits}" />
+            </StackPanel>
+
+            <!-- ── Price + the receive-only "add" ─────────────────── -->
+            <Grid Grid.Row="2" ColumnSpacing="{StaticResource SpaceXs}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="{Binding PriceText}"
+                           Classes="price"
+                           VerticalAlignment="Center" />
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding UnitSuffix}"
+                           Classes="caption"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+
+                <!-- What is on the shelf. The selling screen needs it as much as the receiving
+                     one: a price without a stock figure is a promise the shelf may not keep. -->
+                <TextBlock Grid.Column="2"
+                           Text="{Binding OnHandText}"
+                           Classes="caption"
+                           VerticalAlignment="Center"
+                           IsVisible="{Binding ShowsStockWarnings}" />
+
+                <TextBlock Grid.Column="2"
+                           Text="＋ إضافة"
+                           Classes="caption"
+                           FontWeight="Bold"
+                           VerticalAlignment="Center"
+                           IsVisible="{Binding ShowsAddHint}" />
+            </Grid>
+        </Grid>
+    </Button>
+</UserControl>

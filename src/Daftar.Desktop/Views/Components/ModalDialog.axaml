@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="using:Daftar.Views.Components"
+             x:Class="Daftar.Views.Components.ModalDialog"
+             Classes.primary="{Binding PrimaryHeader, RelativeSource={RelativeSource Self}}"
+             FlowDirection="RightToLeft">
+
+    <UserControl.Styles>
+        <!-- The header's chrome lives in a style rather than on the element, so the tinted variant
+             below can replace it. Written inline it would win outright and the blue header would
+             silently stay neutral: an inline setter beats every rule. -->
+        <Style Selector="components|ModalDialog Border.header">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="CornerRadius" Value="10,10,0,0" />
+            <Setter Property="Padding" Value="20,14" />
+        </Style>
+
+        <!-- The tinted header. The white-on-blue is written here rather than inline in each of the
+             two dialogs that want it, because a ✕ that has lost its foreground is invisible. -->
+        <Style Selector="components|ModalDialog.primary Border.header">
+            <Setter Property="Background" Value="#0078D7" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="components|ModalDialog.primary Border.header TextBlock">
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="components|ModalDialog Button.header-close">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="components|ModalDialog ScrollViewer.body">
+            <Setter Property="Background" Value="#F8F9FA" />
+        </Style>
+    </UserControl.Styles>
+
+    <!--
+        The dialog shell. Body and footer come from the screen through attached properties; the
+        backdrop, the card, the header and the footer frame are the same in every dialog in the app
+        and are here once.
+    -->
+    <Grid>
+        <!-- Backdrop. A Button, not a Border, so it can carry the command without a behaviour.
+
+             It stays hit-testable even when BackdropCloses is off, because that setting means "a
+             stray click must not lose a half-typed form", not "clicks pass through to the screen
+             underneath". Turning it off with IsHitTestVisible made every click outside the card land
+             on the button the user had just been looking at behind the dialog. Only the command is
+             taken away. -->
+        <Button Background="#77000000"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Padding="0"
+                BorderThickness="0"
+                CornerRadius="0"
+                IsEnabled="{Binding BackdropCloses, RelativeSource={RelativeSource AncestorType=components:ModalDialog}}"
+                Command="{Binding CloseCommand, RelativeSource={RelativeSource AncestorType=components:ModalDialog}}" />
+
+        <!-- The card, centred, opaque. -->
+        <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Width="{Binding DialogWidth, RelativeSource={RelativeSource AncestorType=components:ModalDialog}}"
+                Height="{Binding DialogHeight, RelativeSource={RelativeSource AncestorType=components:ModalDialog}}"
+                Margin="20"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                BoxShadow="0 14 40 0 #66000000">
+            <Grid RowDefinitions="Auto,*,Auto">
+
+                <!-- Header: title, what it is for, and the way out. -->
+                <Border Grid.Row="0" Classes="header">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=components:ModalDialog}}"
+                                       Classes="subtitle"
+                                       FontWeight="Bold" />
+                            <TextBlock Text="{Binding Subtitle, RelativeSource={RelativeSource AncestorType=components:ModalDialog}}"
+                                       Classes="caption muted"
+                                       IsVisible="{Binding Subtitle, RelativeSource={RelativeSource AncestorType=components:ModalDialog}, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </StackPanel>
+
+                        <!-- Beside the title, not instead of it: a dialog that switches tabs wants
+                             the tabs next to the heading, which is where they always were. -->
+                        <ContentControl Grid.Column="1"
+                                        Margin="0,0,16,0"
+                                        VerticalAlignment="Center"
+                                        Content="{Binding (components:ModalDialog.HeaderExtra), RelativeSource={RelativeSource AncestorType=components:ModalDialog}}"
+                                        IsVisible="{Binding (components:ModalDialog.HeaderExtra), RelativeSource={RelativeSource AncestorType=components:ModalDialog}, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <Button Grid.Column="2"
+                                Classes="ghost header-close"
+                                Command="{Binding CloseCommand, RelativeSource={RelativeSource AncestorType=components:ModalDialog}}"
+                                Width="34" Height="34"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                FontSize="15" FontWeight="Bold"
+                                ToolTip.Tip="إغلاق">
+                            <TextBlock Text="✕" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- Body: the screen's own, scrolling once it outgrows the card. -->
+                <ScrollViewer Grid.Row="1"
+                              Classes="body"
+                              Padding="20,16"
+                              MaxHeight="{Binding BodyMaxHeight, RelativeSource={RelativeSource AncestorType=components:ModalDialog}}">
+                    <ContentControl Content="{Binding (components:ModalDialog.Body), RelativeSource={RelativeSource AncestorType=components:ModalDialog}}" />
+                </ScrollViewer>
+
+                <!-- Footer frame: the screen supplies its own buttons inside it. -->
+                <Border Grid.Row="2"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0"
+                        CornerRadius="0,0,10,10"
+                        Padding="16,12">
+                    <ContentControl Content="{Binding (components:ModalDialog.Footer), RelativeSource={RelativeSource AncestorType=components:ModalDialog}}" />
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

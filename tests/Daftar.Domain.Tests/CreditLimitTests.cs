@@ -277,6 +277,58 @@ public sealed class CreditLimitTests : IAsyncLifetime, IDisposable
         Assert.Contains("مش نشط", ex.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Nothing owing is not a licence to trade with an account the business has stopped trading with,
+    /// which is why the status gate is judged before the balance and not after it.
+    /// </summary>
+    [Fact]
+    public async Task A_Blocked_Customer_Cannot_Buy_For_Cash_Either()
+    {
+        var customer = await MakeCustomerAsync(creditLimit: 0m, quantity: 1m, unitPrice: 10m);
+        var (saleId, _) = await LastSaleForAsync(customer.Id);
+
+        // Settled in full, so the credit limit is not in question and the balance is zero.
+        await PayAsync(customer.Id, 10m, saleId);
+
+        var ctx = NewContext();
+        var tracked = await ctx.Parties.FirstAsync(p => p.Id == customer.Id);
+        tracked.Status = PartyStatus.Blocked;
+        await ctx.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<Domain.Shared.DomainException>(() =>
+            new SalePostingService(NewContext()).EnsureCreditAllowsAsync(saleId));
+
+        Assert.Contains("مش نشط", ex.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Pending means "cash only until the manager approves". The balance is what decides which of the
+    /// two a sale is: owing anything is the unapproved credit, owing nothing is the cash sale the
+    /// status allows. Before this, every pending account was refused for any amount, which made the
+    /// customers the settle wizard creates in the field ones it could never invoice.
+    /// </summary>
+    [Fact]
+    public async Task A_Pending_Customer_May_Buy_For_Cash_But_Not_On_Credit()
+    {
+        var customer = await MakeCustomerAsync(creditLimit: 100m, quantity: 1m, unitPrice: 10m);
+        var (saleId, _) = await LastSaleForAsync(customer.Id);
+
+        var ctx = NewContext();
+        var tracked = await ctx.Parties.FirstAsync(p => p.Id == customer.Id);
+        tracked.Status = PartyStatus.Pending;
+        await ctx.SaveChangesAsync();
+
+        // The 10 on the ledger is credit the manager has not approved yet.
+        var credit = await Assert.ThrowsAsync<Domain.Shared.DomainException>(() =>
+            new SalePostingService(NewContext()).EnsureCreditAllowsAsync(saleId));
+
+        Assert.Contains("موافقة المدير", credit.Message, StringComparison.Ordinal);
+
+        // Paying it off leaves nothing owing, and a pending account may do that.
+        await PayAsync(customer.Id, 10m, saleId);
+        await new SalePostingService(NewContext()).EnsureCreditAllowsAsync(saleId);
+    }
+
     private async Task<decimal> LedgerBalanceAsync(int partyId)
     {
         var ctx = NewContext();

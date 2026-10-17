@@ -1,98 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
+             xmlns:components="using:Daftar.Views.Components"
              xmlns:ui="using:FluentAvalonia.UI.Controls"
              x:Class="Daftar.Views.SellView"
              x:DataType="vm:SellViewModel"
              FlowDirection="RightToLeft">
-
-    <UserControl.Styles>
-        <!-- Product tile, in the Start button's blue.
-             These two screens override the shared tile style in Theme/Components.axaml, so the
-             palette is repeated here rather than inherited; both now point at the same three
-             values the Start button uses, so the shop reads as one family.
-
-             Every line of text inside the tile is set white. A TextBlock does not take its
-             foreground from the button, so without the catch-all below the SKU, the unit and the
-             on-hand figures stay dark navy on a dark blue background. The out-of-stock badge on
-             the receive tile has no style of its own at all, and the catch-all is what makes it
-             legible. -->
-        <Style Selector="Button.tile">
-            <Setter Property="Background" Value="#0078D7" />
-            <Setter Property="BorderBrush" Value="#0078D7" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="CornerRadius" Value="0" />
-            <Setter Property="Padding" Value="12,10" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="VerticalContentAlignment" Value="Stretch" />
-            <Setter Property="Cursor" Value="Hand" />
-        </Style>
-        <Style Selector="Button.tile:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#1A86E8" />
-            <Setter Property="TextBlock.Foreground" Value="White" />
-        </Style>
-        <Style Selector="Button.tile:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="#005A9E" />
-            <Setter Property="TextBlock.Foreground" Value="White" />
-        </Style>
-        <!-- Out of stock stays pale: it is the one state that has to look different, and grey on
-             a blue grid reads as "not this one" faster than any label does.
-
-             It has to stay READABLE, though, and that is where repainting the tile went wrong.
-             Theme/Components.axaml already fades every disabled tile to 0.55 opacity, which a pale
-             card with navy text survived and grey-on-grey does not. The result was out-of-stock
-             products rendering at about half strength: a cashier scanning for what has run out
-             could not read what had. Cancelling the fade here and using a darker grey keeps the
-             state obvious without making the name unreadable. -->
-        <Style Selector="Button.tile TextBlock">
-            <Setter Property="Foreground" Value="White" />
-        </Style>
-        <Style Selector="Button.tile TextBlock.strong">
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="FontWeight" Value="Bold" />
-        </Style>
-        <Style Selector="Button.tile TextBlock.price">
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="FontWeight" Value="Bold" />
-        </Style>
-        <!-- Targeting TextBlock directly, not through the presenter: the catch-all rule above sets
-             Foreground on each TextBlock, and a setter that goes via the template loses to it. The
-             first attempt did exactly that and left white text on a pale tile, which is the same
-             unreadable result as no fix at all.
-
-             This block is last on purpose. Avalonia resolves two rules setting the same property by
-             order within the collection, not by specificity, so a catch-all placed after the
-             disabled rule silently wins and the tile stays white-on-pale. -->
-        <Style Selector="Button.tile:disabled">
-            <Setter Property="Opacity" Value="1" />
-            <Setter Property="Background" Value="#E9E9E9" />
-            <Setter Property="BorderBrush" Value="#BFBFBF" />
-            <Setter Property="BorderThickness" Value="1.5" />
-        </Style>
-        <Style Selector="Button.tile:disabled TextBlock">
-            <Setter Property="Foreground" Value="#3A3A3A" />
-        </Style>
-
-        <!-- Keep the ComboBox readable inside blue product tiles -->
-        <Style Selector="Button.tile ComboBox">
-            <Setter Property="Foreground" Value="#222222" />
-            <Setter Property="Background" Value="#FFFFFF" />
-        </Style>
-
-        <Style Selector="Button.tile ComboBox /template/ ContentPresenter#PART_SelectionBoxItem">
-            <Setter Property="Foreground" Value="#222222" />
-        </Style>
-
-        <Style Selector="Button.tile ComboBoxItem">
-            <Setter Property="Foreground" Value="#222222" />
-            <Setter Property="Background" Value="#FFFFFF" />
-        </Style>
-
-        <Style Selector="Button.tile ComboBoxItem TextBlock">
-            <Setter Property="Foreground" Value="#222222" />
-        </Style>
-    </UserControl.Styles>
 
     <!--
         بيع / Sales screen
@@ -120,176 +33,19 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBox Name="SearchBox"
-                         Text="{Binding ProductSearchText}"
-                         KeyDown="OnSearchKeyDown"
-                         PlaceholderText="ابحث باسم الصنف أو امسح الباركود"
-                         FontSize="{StaticResource FontSizeSubtitle}"
-                         Height="{StaticResource SearchHeight}"
-                         VerticalContentAlignment="Center">
-                    <TextBox.InnerLeftContent>
-                        <PathIcon Data="{StaticResource IconSearch}"
-                                  Width="16"
-                                  Height="16"
-                                  Margin="12,0"
-                                  Opacity="0.6" />
-                    </TextBox.InnerLeftContent>
-                </TextBox>
+                <components:SearchBox Name="SearchBox" KeyDown="OnSearchKeyDown" Text="{Binding ProductSearchText}" Placeholder="ابحث باسم الصنف أو امسح الباركود" Large="True" />
 
                 <TextBlock Grid.Column="1"
                            Classes="caption"
                            VerticalAlignment="Center"
-                           Text="{Binding FilteredProducts.Count, StringFormat='{}{0} صنف'}" />
+                           Text="{Binding FilteredProducts.Count, Converter={StaticResource ArabicCount}, ConverterParameter='صنف|صنفان|أصناف'}" />
             </Grid>
 
             <Grid Grid.Row="1">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <ui:FAItemsRepeater ItemsSource="{Binding FilteredProducts}"
-                                   Margin="0,0,0,8">
-                        <ui:FAItemsRepeater.Layout>
-                            <ui:FAUniformGridLayout MinItemWidth="{StaticResource TileMinWidth}"
-                                                MinItemHeight="{StaticResource TileHeight}"
-                                                MinRowSpacing="{StaticResource SpaceSm}"
-                                                MinColumnSpacing="{StaticResource SpaceSm}"
-                                                ItemsStretch="Fill" />
-                        </ui:FAItemsRepeater.Layout>
+                <!-- The tiles, and the grid they sit in, are one component now.
+                     Both screens used to carry this block verbatim. -->
+                <components:ProductTileGrid ItemsSource="{Binding FilteredProducts}" />
 
-                        <ui:FAItemsRepeater.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ProductOption">
-                                <Button Classes="tile"
-                                        Command="{Binding $parent[UserControl].((vm:SellViewModel)DataContext).SelectProductCommand}"
-                                        CommandParameter="{Binding}"
-                                        IsEnabled="{Binding HasStock}">
-
-                                    <ToolTip.Tip>
-                                        <TextBlock Text="{Binding Display}"
-                                                Classes="strong"
-                                                TextWrapping="Wrap"
-                                                MaxWidth="250"
-                                                Foreground="#333333" />
-                                    </ToolTip.Tip>
-
-                                    <Grid RowDefinitions="Auto,*,Auto">
-
-                                        <!-- SKU + stock flag -->
-                                        <Grid Grid.Row="0"
-                                            ColumnSpacing="{StaticResource SpaceSm}">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-
-                                            <TextBlock Text="{Binding Sku}"
-                                                    Classes="caption"
-                                                    TextTrimming="CharacterEllipsis"
-                                                    VerticalAlignment="Center" />
-
-                                            <StackPanel Grid.Column="1"
-                                                        Orientation="Horizontal"
-                                                        Spacing="{StaticResource SpaceXs}">
-                                                <Border Classes="badge warning"
-                                                        IsVisible="{Binding IsLowStock}">
-                                                    <TextBlock Text="مخزون منخفض" />
-                                                </Border>
-
-                                                <Border Classes="badge danger"
-                                                        IsVisible="{Binding !HasStock}">
-                                                    <TextBlock Text="نفد المخزون" />
-                                                </Border>
-                                            </StackPanel>
-                                        </Grid>
-
-                                        <!-- Product name + unit selection -->
-                                        <StackPanel Grid.Row="1"
-                                                    VerticalAlignment="Center"
-                                                    Margin="0,3">
-
-                                            <TextBlock Text="{Binding Name}"
-                                                    Classes="strong"
-                                                    TextWrapping="Wrap"
-                                                    MaxLines="2"
-                                                    TextTrimming="CharacterEllipsis" />
-
-                                            <ComboBox ItemsSource="{Binding AvailableUnits}"
-                                                    SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
-                                                    DisplayMemberBinding="{Binding UnitName}"
-                                                    IsVisible="{Binding HasMultipleUnits}"
-                                                    HorizontalAlignment="Center"
-                                                    MinHeight="24"
-                                                    Height="24"
-                                                    FontSize="11"
-                                                    Padding="6,1"
-                                                    Margin="0,2,0,0"
-                                                    Foreground="#222222"
-                                                    Background="#FFFFFF"
-                                                    VerticalContentAlignment="Center">
-
-                                                <ComboBox.Styles>
-                                                    <Style Selector="ComboBoxItem">
-                                                        <Setter Property="Foreground" Value="#222222" />
-                                                        <Setter Property="Background" Value="#FFFFFF" />
-                                                    </Style>
-                                                </ComboBox.Styles>
-                                            </ComboBox>
-
-                                            <TextBlock Text="{Binding UnitName, StringFormat='({0})'}"
-                                                    Classes="caption"
-                                                    FontWeight="SemiBold"
-                                                    Margin="0,2,0,0"
-                                                    HorizontalAlignment="Center"
-                                                    IsVisible="{Binding !HasMultipleUnits}" />
-                                        </StackPanel>
-
-                                        <!-- Price + unit + stock -->
-                                        <Grid Grid.Row="2"
-                                            ColumnSpacing="{StaticResource SpaceXs}">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-
-                                            <TextBlock Text="{Binding PriceText}"
-                                                    Classes="price"
-                                                    VerticalAlignment="Center" />
-
-                                            <TextBlock Grid.Column="1"
-                                                    Text="{Binding UnitName, StringFormat='/ {}{0}'}"
-                                                    Classes="caption"
-                                                    VerticalAlignment="Center"
-                                                    TextTrimming="CharacterEllipsis" />
-
-                                            <TextBlock Grid.Column="2"
-                                                    Text="{Binding OnHandText}"
-                                                    Classes="caption"
-                                                    VerticalAlignment="Center"
-                                                    IsVisible="{Binding HasStock}" />
-                                        </Grid>
-
-                                    </Grid>
-                                </Button>
-                            </DataTemplate>
-                        </ui:FAItemsRepeater.ItemTemplate>
-                    </ui:FAItemsRepeater>
-                </ScrollViewer>
-
-                <StackPanel Spacing="{StaticResource SpaceXs}"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            IsVisible="{Binding !FilteredProducts.Count}">
-                    <PathIcon Data="{StaticResource IconSearch}"
-                              Width="40"
-                              Height="40"
-                              Opacity="0.35"
-                              HorizontalAlignment="Center" />
-                    <TextBlock Text="لا توجد أصناف مطابقة"
-                               Classes="subtitle"
-                               HorizontalAlignment="Center" />
-                    <TextBlock Text="جرّب اسمًا آخر أو امسح الباركود"
-                               Classes="caption"
-                               HorizontalAlignment="Center" />
-                </StackPanel>
             </Grid>
         </Grid>
 

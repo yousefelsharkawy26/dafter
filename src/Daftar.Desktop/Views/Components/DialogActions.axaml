@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="using:Daftar.Views.Components"
+             x:Class="Daftar.Views.Components.DialogActions"
+             FlowDirection="RightToLeft">
+
+    <!--
+        Busy bar on the left, Cancel and the one real action on the right. The bar grows into the
+        space rather than pushing the buttons around, so a press that starts saving does not move
+        the button the cashier is about to press again.
+    -->
+    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+        <ProgressBar Grid.Column="0"
+                     IsIndeterminate="True"
+                     Height="4"
+                     VerticalAlignment="Center"
+                     IsVisible="{Binding IsBusy, RelativeSource={RelativeSource AncestorType=components:DialogActions}}" />
+
+        <Button Grid.Column="1"
+                Classes="ghost"
+                Content="إلغاء"
+                Height="36"
+                Padding="16,6"
+                Command="{Binding CancelCommand, RelativeSource={RelativeSource AncestorType=components:DialogActions}}" />
+
+        <Button Grid.Column="2"
+                Classes="accent"
+                Height="36"
+                Padding="20,6"
+                Command="{Binding SaveCommand, RelativeSource={RelativeSource AncestorType=components:DialogActions}}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="✓" FontWeight="Bold" />
+                <TextBlock Text="{Binding SaveText, RelativeSource={RelativeSource AncestorType=components:DialogActions}}"
+                           FontWeight="Bold" />
+            </StackPanel>
+        </Button>
+    </Grid>
+</UserControl>

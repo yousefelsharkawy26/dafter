@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="using:Daftar.Views.Components"
+             x:Class="Daftar.Views.Components.KpiTile"
+             FlowDirection="RightToLeft">
+
+    <!--
+        A label, a figure, and optionally an icon beside the label and a note under the figure.
+
+        The three screens that use this each had their own version of the same box — different
+        wrapper class, different padding, different label style — so the same number looked like a
+        different number depending on where it was read. One box now.
+    -->
+    <Border Classes="panel" Padding="14,12">
+        <StackPanel Spacing="4">
+
+            <!-- Label, with the icon beside it when there is one. -->
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding Label, RelativeSource={RelativeSource AncestorType=components:KpiTile}}"
+                           Classes="caption muted" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding Icon, RelativeSource={RelativeSource AncestorType=components:KpiTile}}"
+                           FontSize="14"
+                           Opacity="0.7"
+                           IsVisible="{Binding Icon, RelativeSource={RelativeSource AncestorType=components:KpiTile}, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </Grid>
+
+            <!--
+                The figure. Its brush is applied in the code-behind; see the note there.
+
+                The size is load-bearing, not decoration. At 16 DIP bold the figure is ordinary text
+                and owes a 4.5 contrast floor, which four of the colours the sessions and reports
+                pages hand it fail (they measure between 4.35 and 4.46 on the panel). At FontSizeTitle
+                — 20 DIP bold — it is WCAG "large text", owes 3.0, and every one of them clears. That
+                is the whole fix: the number gets the size a KPI figure should have had anyway.
+            -->
+            <TextBlock Name="ValueText"
+                       Text="{Binding Value, RelativeSource={RelativeSource AncestorType=components:KpiTile}}"
+                       FontSize="{DynamicResource FontSizeTitle}"
+                       FontWeight="Bold"
+                       TextTrimming="CharacterEllipsis" />
+
+            <!-- The note under it. -->
+            <ContentControl Content="{Binding Detail, RelativeSource={RelativeSource AncestorType=components:KpiTile}}"
+                            IsVisible="{Binding Detail, RelativeSource={RelativeSource AncestorType=components:KpiTile}, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+    </Border>
+</UserControl>

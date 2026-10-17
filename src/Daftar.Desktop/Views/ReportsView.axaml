@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
+             xmlns:components="using:Daftar.Views.Components"
              x:Class="Daftar.Views.ReportsView"
              x:DataType="vm:ReportsViewModel"
              FlowDirection="RightToLeft">
@@ -73,17 +74,15 @@
         <UniformGrid Grid.Row="1" Columns="{Binding KpiCardCount}" Margin="0,0,0,12">
 
             <!-- Card 1: Sales -->
-            <Border Classes="panel" Padding="14,12" Margin="0,0,12,0">
-                <StackPanel Spacing="4">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Text="إجمالي المبيعات" Classes="caption muted" />
-                        <TextBlock Grid.Column="1" Text="📊" FontSize="14" Opacity="0.7" />
-                    </Grid>
-                    <TextBlock Text="{Binding TotalSalesText}" Classes="subtitle" FontWeight="Bold"
-                               Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
-                    <TextBlock Text="{Binding InvoicesCountText}" Classes="caption muted" />
-                </StackPanel>
-            </Border>
+            <components:KpiTile Margin="0,0,12,0" Label="إجمالي المبيعات" Icon="📊" Value="{Binding TotalSalesText}" ValueBrush="{DynamicResource AccentFillColorDefaultBrush}" Detail="{Binding InvoicesCountText}" />
+
+            <!--
+                Cards 2 and 3 are the only hand-written tiles left in this row. Their figures carry
+                the same size the tile's figure does, explicitly, because they do not inherit it:
+                the tile was moved up to FontSizeTitle when four of the colours it is handed turned
+                out to fail at 16 DIP, and a hand-written copy left behind would have shown the
+                second and third numbers of the row a step smaller than the first, fourth and fifth.
+            -->
 
             <!-- Card 2: Cost of Goods. Hidden without Reports.Cost: the column would
                  otherwise sit there showing dashes and read as a broken figure. -->
@@ -94,7 +93,7 @@
                         <TextBlock Text="تكلفة البضاعة المباعة" Classes="caption muted" />
                         <TextBlock Grid.Column="1" Text="📦" FontSize="14" Opacity="0.7" />
                     </Grid>
-                    <TextBlock Text="{Binding TotalCostText}" Classes="subtitle" FontWeight="Bold" />
+                    <TextBlock Text="{Binding TotalCostText}" FontSize="{DynamicResource FontSizeTitle}" FontWeight="Bold" />
                     <TextBlock Text="تكلفة المنتجات من المخزن" Classes="caption muted" />
                 </StackPanel>
             </Border>
@@ -107,7 +106,7 @@
                         <TextBlock Text="صافي أرباح المبيعات" Classes="caption muted" />
                         <TextBlock Grid.Column="1" Text="💰" FontSize="14" Opacity="0.7" />
                     </Grid>
-                    <TextBlock Text="{Binding TotalMarginText}" Classes="subtitle" FontWeight="Bold" Foreground="#107C41" />
+                    <TextBlock Text="{Binding TotalMarginText}" FontSize="{DynamicResource FontSizeTitle}" FontWeight="Bold" Foreground="#107C41" />
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <Border Classes="badge success">
                             <TextBlock Text="{Binding MarginPercentText}" />
@@ -118,28 +117,10 @@
             </Border>
 
             <!-- Card 4: Collections -->
-            <Border Classes="panel" Padding="14,12" Margin="0,0,12,0">
-                <StackPanel Spacing="4">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Text="إجمالي التحصيلات" Classes="caption muted" />
-                        <TextBlock Grid.Column="1" Text="📥" FontSize="14" Opacity="0.7" />
-                    </Grid>
-                    <TextBlock Text="{Binding CollectionsText}" Classes="subtitle" FontWeight="Bold" Foreground="#0078D4" />
-                    <TextBlock Text="{Binding CollectionRatioText}" Classes="caption muted" />
-                </StackPanel>
-            </Border>
+            <components:KpiTile Margin="0,0,12,0" Label="إجمالي التحصيلات" Icon="📥" Value="{Binding CollectionsText}" ValueBrush="#0078D4" Detail="{Binding CollectionRatioText}" />
 
             <!-- Card 5: Overdue Receivables -->
-            <Border Classes="panel" Padding="14,12" Margin="0,0,12,0">
-                <StackPanel Spacing="4">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Text="المتأخرات المستحقة" Classes="caption muted" />
-                        <TextBlock Grid.Column="1" Text="⚠️" FontSize="14" Opacity="0.7" />
-                    </Grid>
-                    <TextBlock Text="{Binding OverdueText}" Classes="subtitle" FontWeight="Bold" Foreground="#D13438" />
-                    <TextBlock Text="{Binding OverdueCountText}" Classes="caption muted" />
-                </StackPanel>
-            </Border>
+            <components:KpiTile Margin="0,0,12,0" Label="المتأخرات المستحقة" Icon="⚠️" Value="{Binding OverdueText}" ValueBrush="#D13438" Detail="{Binding OverdueCountText}" />
         </UniformGrid>
 
         <!-- ========================================================
@@ -273,13 +254,7 @@
                                 </DataGrid>
 
                                 <!-- Drawer Summary Footer -->
-                                <Border Grid.Row="2" Classes="panel" Padding="10" Margin="0,10,0,0">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <TextBlock Text="إجمالي الفاتورة:" Classes="caption muted" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1" Text="{Binding SelectedSale.TotalText}"
-                                                   FontWeight="Bold" Classes="subtitle" VerticalAlignment="Center" />
-                                    </Grid>
-                                </Border>
+                                <components:KpiTile Margin="0,10,0,0" Label="إجمالي الفاتورة:" Value="{Binding SelectedSale.TotalText}" />
                             </Grid>
                         </Border>
                     </Grid>

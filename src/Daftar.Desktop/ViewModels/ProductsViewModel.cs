@@ -370,7 +370,7 @@ public partial class ProductsViewModel(IServiceProvider services) : ObservableOb
 
         PriceUnit = Units.FirstOrDefault(u => u.IsDefaultSale) ?? Units.FirstOrDefault();
         HasError = false;
-        Status = $"صنف: {row.Name} ({Units.Count} وحدة · {Prices.Count} سعر)";
+        Status = $"صنف: {row.Name} ({ArabicText.Count(Units.Count, "وحدة", "وحدتان", "وحدات")} · {ArabicText.Count(Prices.Count, "سعر", "سعران", "أسعار")})";
         }
         finally
         {

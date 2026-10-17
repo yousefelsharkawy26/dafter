@@ -67,7 +67,15 @@ run_app() {
 # bug that was already fixed, or hides one that is not.
 
 echo "1. first run: creates and migrates the database"
-rm -rf "$data"
+# Wiped by default so a capture is never against yesterday's state. Set DAFTAR_KEEP_DATA=1 to keep
+# it: the sell and receive screens have nothing to show without products in them, and a script that
+# destroys its own data cannot be used to look at a screen that needs data. That is the whole reason
+# this flag exists — without it there is no way to see the till with anything on it.
+if [ "${DAFTAR_KEEP_DATA:-0}" = "1" ]; then
+    echo "   DAFTAR_KEEP_DATA=1: keeping $data"
+else
+    rm -rf "$data"
+fi
 : >/tmp/daftar-app.log
 run_app
 pkill -f "Daftar.Desktop" 2>/dev/null || true

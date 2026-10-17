@@ -129,24 +129,137 @@
          Primary action  → FluentAvalonia's built-in Classes="accent"
          Everything else → the classes below -->
 
-    <!-- Product tile -->
+    <!-- ───────────── Product tile ─────────────
+         ONE definition for both the sell and receive screens. It used to be a copy pasted into
+         each of them, and the copies drifted: the disabled state and the unit picker were fixed
+         in one and missed in the other. A rule that has to be remembered in two places is a rule
+         that will be remembered in one.
+
+         The blue is the Start button's, so the shop reads as one family.
+
+         ORDER IS LOAD-BEARING HERE, twice over:
+
+           1. The catch-all that whitens every TextBlock has to come before the disabled rules,
+              which darken them. Avalonia resolves two rules that set the same property by order
+              within the collection, not by specificity, so a catch-all below the disabled rule
+              wins silently and out-of-stock tiles go back to white text on a pale background.
+           2. That catch-all also has to apply to the TextBlock itself rather than through the
+              template's ContentPresenter. A setter routed via the template loses to a rule that
+              targets the TextBlock directly, which fails just as quietly.
+
+         Both of those were shipped once before this file existed, in the copies. -->
     <Style Selector="Button.tile">
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="{DynamicResource OverlayCornerRadius}" />
+        <Setter Property="Background" Value="#0078D7" />
+        <Setter Property="BorderBrush" Value="#0078D7" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="CornerRadius" Value="0" />
         <Setter Property="Padding" Value="{DynamicResource TilePadding}" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="Cursor" Value="Hand" />
     </Style>
-    <Style Selector="Button.tile:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorSecondaryBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+    <Style Selector="Button.tile:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#1A86E8" />
+        <Setter Property="TextBlock.Foreground" Value="White" />
     </Style>
+    <Style Selector="Button.tile:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="#005A9E" />
+        <Setter Property="TextBlock.Foreground" Value="White" />
+    </Style>
+
+    <!-- Every line of text in the tile, not just the labelled ones: a TextBlock does not take
+         its foreground from the button, so without this the SKU, the unit and the on-hand figure
+         stay dark navy on a dark blue background. -->
+    <Style Selector="Button.tile TextBlock">
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.tile TextBlock.strong">
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="Button.tile TextBlock.price">
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <!-- The unit picker sits on the blue, so it is a light box of its own. The receive screen
+         has the same picker and had no rules for it at all, which is what the copies cost. -->
+    <Style Selector="Button.tile ComboBox">
+        <Setter Property="Foreground" Value="#222222" />
+        <Setter Property="Background" Value="#FFFFFF" />
+    </Style>
+    <Style Selector="Button.tile ComboBox /template/ ContentPresenter#PART_SelectionBoxItem">
+        <Setter Property="Foreground" Value="#222222" />
+    </Style>
+    <Style Selector="Button.tile ComboBoxItem">
+        <Setter Property="Foreground" Value="#222222" />
+        <Setter Property="Background" Value="#FFFFFF" />
+    </Style>
+    <Style Selector="Button.tile ComboBoxItem TextBlock">
+        <Setter Property="Foreground" Value="#222222" />
+    </Style>
+
+    <!-- The selected unit is painted by the ComboBox's own template, so it is also caught by the
+         white-TextBlock rule above and comes out white on a white box: a picker with a chevron and
+         nothing written next to it. It has to be addressed by targeting the TextBlock itself, and
+         after that rule, because a setter routed through the template's presenter loses to one
+         that targets the control directly. -->
+    <Style Selector="Button.tile ComboBox TextBlock">
+        <Setter Property="Foreground" Value="#222222" />
+    </Style>
+    <Style Selector="Button.tile ComboBox /template/ ContentPresenter#PART_SelectionBoxItem TextBlock">
+        <Setter Property="Foreground" Value="#222222" />
+    </Style>
+
+    <!-- Badges are pale pills sitting on the blue, so their text has to be dark. Two mistakes were
+         stacked here. They were written up with the other badges, above the white-TextBlock
+         catch-all, and Avalonia resolves competing setters by source order rather than by
+         specificity, so the catch-all overtook them and "مخزون منخفض" came out white on a cream
+         pill. Repeating the rules after the catch-all, scoped to the tile, fixes the order.
+
+         Fixing the order alone was not enough: the Fluent *Brush resources are the outline and
+         text colours, and setting one on its own tinted background measures 2.28 — legible on a
+         white page, not on a pill that sits on a saturated blue. So the text is one dark ink and
+         the background keeps carrying the colour coding, which is the signal that matters.
+
+         Measured after the change: 15.1 on caution, 13.7 on critical, 14.8 on success. -->
+    <Style Selector="Button.tile Border.badge > TextBlock">
+        <Setter Property="Foreground" Value="#1A1A1A" />
+    </Style>
+
+    <!-- The cart count is the exception: its pill is filled, so it wants light ink rather than the
+         dark used for the pale tints. It has to come after the rule above or it inherits that ink
+         and lands dark-on-blue. Its fill is a deep navy rather than AccentFillColorDefaultBrush
+         because white on the brand blue measures 2.35:1, and on Fluent's derived accent 3.58:1,
+         both under the 4.5 floor. White on this is 5.1:1, and it still reads as the app's blue. -->
+    <Style Selector="Button.tile Border.badge.count">
+        <Setter Property="Background" Value="#08304F" />
+    </Style>
+    <Style Selector="Button.tile Border.badge.count > TextBlock">
+        <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+
+    <!-- The on-hand pill was a translucent white over the tile. Alpha cannot be contrast-checked,
+         so it was also a badge that could not be verified, and white on a lightened blue is
+         marginal anyway. An opaque tint says the same thing and can be measured. -->
+    <Style Selector="Button.tile Border.badge.info">
+        <Setter Property="Background" Value="#D7E9F8" />
+    </Style>
+
+    <!-- Out of stock: pale, because it is the one state that has to look different, and readable,
+         because grey on a blue grid says "not this one" faster than any label. The fade that used
+         to live here applied to both states and made the name unreadable. -->
     <Style Selector="Button.tile:disabled">
-        <Setter Property="Opacity" Value="0.55" />
+        <Setter Property="Opacity" Value="1" />
+        <Setter Property="Background" Value="#E9E9E9" />
+        <Setter Property="BorderBrush" Value="#BFBFBF" />
+        <Setter Property="BorderThickness" Value="1.5" />
+    </Style>
+    <Style Selector="Button.tile:disabled TextBlock">
+        <Setter Property="Foreground" Value="#3A3A3A" />
     </Style>
 
     <!-- Quiet text button -->

@@ -33,7 +33,7 @@ public partial class ReceiveView : UserControl
             return;
 
         _loaded = true;
-        await vm.LoadAsync();
+        await ScreenLoad.Run(vm.LoadAsync, m => vm.Status = m);
         FocusSearch();
     }
 
@@ -41,8 +41,8 @@ public partial class ReceiveView : UserControl
     {
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            var searchBox = this.FindControl<TextBox>("SearchBox");
-            searchBox?.Focus();
+            var searchBox = this.FindControl<Views.Components.SearchBox>("SearchBox");
+            searchBox?.FocusSearch();
         });
     }
 

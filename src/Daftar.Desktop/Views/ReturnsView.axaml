@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
+             xmlns:components="using:Daftar.Views.Components"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -44,7 +45,7 @@
                         <Border Classes="surface" Padding="10,4" IsVisible="{Binding TodayReturnsCount}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <TextBlock Text="مرتجعات اليوم:" Classes="caption" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding TodayReturnsCount, StringFormat='{}{0} مرتجع'}" Classes="strong success" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding TodayReturnsCount, Converter={StaticResource ArabicCount}, ConverterParameter='مرتجع|مرتجعان|مرتجعات'}" Classes="strong success" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding TodayReturnsAmount, StringFormat='({0:N2} ج.م)'}" Classes="caption muted" VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
@@ -115,15 +116,7 @@
 
                             <!-- Search Input & Button -->
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                <TextBox Grid.Column="0"
-                                         Text="{Binding InvoiceSearchQuery, Mode=TwoWay}"
-                                         PlaceholderText="اكتب رقم الفاتورة أو اسم العميل أو الهاتف..."
-                                         Height="38"
-                                         VerticalContentAlignment="Center">
-                                    <TextBox.InnerLeftContent>
-                                        <PathIcon Data="{StaticResource IconSearch}" Width="15" Height="15" Margin="10,0" Opacity="0.6" />
-                                    </TextBox.InnerLeftContent>
-                                </TextBox>
+                                <components:SearchBox Grid.Column="0" Text="{Binding InvoiceSearchQuery, Mode=TwoWay}" Placeholder="اكتب رقم الفاتورة أو اسم العميل أو الهاتف..." />
 
                                 <Button Grid.Column="1" Classes="primary" Content="بحث عن الفواتير"
                                         Command="{Binding SearchInvoicesCommand}" Padding="16,8" />
@@ -272,15 +265,7 @@
                         <!-- Filter & Search Bar -->
                         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,10">
                             <!-- Search TextBox -->
-                            <TextBox Grid.Column="0"
-                                     Text="{Binding SearchText, Mode=TwoWay}"
-                                     PlaceholderText="ابحث برقم المرتجع، رقم الفاتورة الأصلية، أو اسم العميل..."
-                                     Height="38"
-                                     VerticalContentAlignment="Center">
-                                <TextBox.InnerLeftContent>
-                                    <PathIcon Data="{StaticResource IconSearch}" Width="15" Height="15" Margin="10,0" Opacity="0.6" />
-                                </TextBox.InnerLeftContent>
-                            </TextBox>
+                            <components:SearchBox Grid.Column="0" Text="{Binding SearchText, Mode=TwoWay}" Placeholder="ابحث برقم المرتجع، رقم الفاتورة الأصلية، أو اسم العميل..." />
 
                             <!-- Date Filter Chips -->
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">

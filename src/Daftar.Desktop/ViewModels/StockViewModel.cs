@@ -766,7 +766,7 @@ public partial class StockViewModel(IServiceProvider services) : ObservableObjec
 
             ApplyFilter();
             ApplyTrackingFilter();
-            StatusMessage = $"تم التحديث: {_allRows.Count} لوت مخزني | {_allMovements.Count} حركة مسجلة";
+            StatusMessage = $"تم التحديث: {ArabicText.Count(_allRows.Count, "لوت مخزني", "لوتان مخزنيان", "لوتات مخزنية")} | {ArabicText.Count(_allMovements.Count, "حركة مسجلة", "حركتان مسجلتان", "حركات مسجلة")}";
         }
         catch (Exception ex)
         {

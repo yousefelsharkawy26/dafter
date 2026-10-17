@@ -36,6 +36,9 @@ public sealed class TransactionScope : IDisposable, IAsyncDisposable
 {
     private readonly IDbContextTransaction? _owned;
 
+    /// <summary>Set once this scope's commit has succeeded; a committed transaction cannot be undone.</summary>
+    private bool _committed;
+
     private TransactionScope(IDbContextTransaction? owned) => _owned = owned;
 
     /// <summary>True when this scope opened the transaction and is responsible for ending it.</summary>
@@ -57,14 +60,30 @@ public sealed class TransactionScope : IDisposable, IAsyncDisposable
     }
 
     /// <summary>Commits if this scope owns the transaction; a no-op for a nested scope.</summary>
-    public Task CommitAsync(CancellationToken cancellationToken = default)
-        => _owned is null
-            ? Task.CompletedTask
-            : _owned.CommitAsync(cancellationToken);
+    public async Task CommitAsync(CancellationToken cancellationToken = default)
+    {
+        if (_owned is null)
+            return;
 
-    /// <summary>Rolls back if this scope owns the transaction; a no-op for a nested scope.</summary>
+        await _owned.CommitAsync(cancellationToken);
+        _committed = true;
+    }
+
+    /// <summary>
+    /// Rolls back if this scope owns the transaction and it is still open; a no-op for a nested
+    /// scope, and a no-op once the transaction has been committed.
+    /// </summary>
+    /// <remarks>
+    /// Callers keep working after <see cref="CommitAsync"/> — the refresh that follows a posting
+    /// reads back what was just written — and they do it inside the <c>try</c> whose <c>catch</c>
+    /// rolls back. When that refresh is the thing that fails, the rollback is asked to undo a
+    /// transaction that has already committed, and EF answers with <c>InvalidOperationException</c>
+    /// from inside the catch block, replacing the reason the user was about to be shown. There is
+    /// nothing left to undo after a commit, so declining here costs nothing and keeps the original
+    /// failure intact.
+    /// </remarks>
     public Task RollbackAsync(CancellationToken cancellationToken = default)
-        => _owned is null
+        => _owned is null || _committed
             ? Task.CompletedTask
             : _owned.RollbackAsync(cancellationToken);
 

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
+             xmlns:components="using:Daftar.Views.Components"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -47,31 +48,13 @@
                 <!-- KPIs & Balances Grid -->
                 <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
                     <!-- Total Liquidity Card -->
-                    <Border Grid.Column="0" Classes="surface" Padding="14,10">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="إجمالي السيولة المتاحة" Classes="caption muted" />
-                            <TextBlock Text="{Binding TotalLiquidity, StringFormat='{}{0:N2} ج.م'}"
-                                       Classes="subtitle" FontWeight="Bold" Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
-                        </StackPanel>
-                    </Border>
+                    <components:KpiTile Grid.Column="0" Label="إجمالي السيولة المتاحة" Value="{Binding TotalLiquidity, StringFormat='{}{0:N2} ج.م'}" ValueBrush="{DynamicResource AccentFillColorDefaultBrush}" />
 
                     <!-- Cash Drawer Balance Card -->
-                    <Border Grid.Column="1" Classes="surface" Padding="14,10">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="الخزينة النقدية (الكاشير) 💵" Classes="caption muted" />
-                            <TextBlock Text="{Binding CashDrawerBalance, StringFormat='{}{0:N2} ج.م'}"
-                                       Classes="subtitle" FontWeight="Bold" Foreground="#107C41" />
-                        </StackPanel>
-                    </Border>
+                    <components:KpiTile Grid.Column="1" Label="الخزينة النقدية (الكاشير) 💵" Value="{Binding CashDrawerBalance, StringFormat='{}{0:N2} ج.م'}" ValueBrush="#107C41" />
 
                     <!-- Wallets Balance Card -->
-                    <Border Grid.Column="2" Classes="surface" Padding="14,10">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="المحافظ الإلكترونية 📱" Classes="caption muted" />
-                            <TextBlock Text="{Binding WalletsBalance, StringFormat='{}{0:N2} ج.م'}"
-                                       Classes="subtitle" FontWeight="Bold" Foreground="#0078D4" />
-                        </StackPanel>
-                    </Border>
+                    <components:KpiTile Grid.Column="2" Label="المحافظ الإلكترونية 📱" Value="{Binding WalletsBalance, StringFormat='{}{0:N2} ج.م'}" ValueBrush="#0078D4" />
 
                     <!-- Today Net Flow -->
                     <Border Grid.Column="3" Classes="surface" Padding="14,10">
@@ -125,15 +108,7 @@
 
                     <!-- Search & Filter Bar -->
                     <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,10">
-                        <TextBox Grid.Column="0"
-                                 Text="{Binding SearchText, Mode=TwoWay}"
-                                 PlaceholderText="ابحث بالطرف، رقم السند، الحساب المالي، أو المرجع..."
-                                 Height="38"
-                                 VerticalContentAlignment="Center">
-                            <TextBox.InnerLeftContent>
-                                <PathIcon Data="{StaticResource IconSearch}" Width="15" Height="15" Margin="10,0" Opacity="0.6" />
-                            </TextBox.InnerLeftContent>
-                        </TextBox>
+                        <components:SearchBox Grid.Column="0" Text="{Binding SearchText, Mode=TwoWay}" Placeholder="ابحث بالطرف، رقم السند، الحساب المالي، أو المرجع..." />
 
                         <!-- Quick Filter Chips -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
@@ -294,388 +269,325 @@
         <!-- ========================================================
              5. Floating Modal Dialog Overlay (سندات، مصروفات، تحويلات)
              ======================================================== -->
-        <Grid Grid.Row="0" Grid.RowSpan="4"
-              IsVisible="{Binding IsActionDialogOpen}"
-              ZIndex="1000">
+        <components:ModalDialog IsVisible="{Binding IsActionDialogOpen}"
+                             Title="{Binding ActionDialogTitle}"
+                             Subtitle="أدخل تفاصيل العملية المالية ثم اضغط ترحيل"
+                             CloseCommand="{Binding CloseActionDialogCommand}"
+                             BackdropCloses="True"
+                             DialogWidth="820"
+                             ZIndex="1000">
 
-            <!-- Backdrop: dims background and closes dialog on click -->
-            <Button Command="{Binding CloseActionDialogCommand}"
-                    Background="#77000000"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Padding="0"
-                    BorderThickness="0"
-                    CornerRadius="0" />
+            <components:ModalDialog.HeaderExtra>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button Classes="tab-btn"
+                            Classes.accent="{Binding IsVouchersTabActive}"
+                            Command="{Binding ShowVouchersTabCommand}"
+                            Padding="10,6">
+                        <TextBlock Text="📝 سند طرف" FontWeight="SemiBold" FontSize="12" />
+                    </Button>
+                    <Button Classes="tab-btn"
+                            Classes.accent="{Binding IsMovementsTabActive}"
+                            Command="{Binding ShowMovementsTabCommand}"
+                            Padding="10,6">
+                        <TextBlock Text="💸 مصروف" FontWeight="SemiBold" FontSize="12" />
+                    </Button>
+                    <Button Classes="tab-btn"
+                            Classes.accent="{Binding IsTransfersTabActive}"
+                            Command="{Binding ShowTransfersTabCommand}"
+                            Padding="10,6">
+                        <TextBlock Text="🔄 تحويل" FontWeight="SemiBold" FontSize="12" />
+                    </Button>
+</StackPanel>
+            </components:ModalDialog.HeaderExtra>
 
-            <!-- Centered Modal Card -->
-            <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
-                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Width="820"
-                    MaxHeight="600"
-                    Margin="24"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    BoxShadow="0 14 40 0 #66000000"
-                    Padding="0">
-                <Grid RowDefinitions="Auto,*,Auto">
-
-                    <!-- Dialog Header -->
-                    <Border Grid.Row="0"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="0,0,0,1"
-                            CornerRadius="8,8,0,0"
-                            Padding="20,14">
-                        <Grid ColumnDefinitions="*,Auto,Auto">
-                            <!-- Title & Subtitle -->
-                            <StackPanel Grid.Column="0" Spacing="2">
-                                <TextBlock Text="{Binding ActionDialogTitle}"
-                                           Classes="subtitle" FontWeight="Bold" />
-                                <TextBlock Text="أدخل تفاصيل العملية المالية ثم اضغط ترحيل"
-                                           Classes="caption muted" />
-                            </StackPanel>
-
-                            <!-- Tab switcher inside dialog -->
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,0,16,0" VerticalAlignment="Center">
-                                <Button Classes="tab-btn"
-                                        Classes.accent="{Binding IsVouchersTabActive}"
-                                        Command="{Binding ShowVouchersTabCommand}"
-                                        Padding="10,6">
-                                    <TextBlock Text="📝 سند طرف" FontWeight="SemiBold" FontSize="12" />
-                                </Button>
-                                <Button Classes="tab-btn"
-                                        Classes.accent="{Binding IsMovementsTabActive}"
-                                        Command="{Binding ShowMovementsTabCommand}"
-                                        Padding="10,6">
-                                    <TextBlock Text="💸 مصروف" FontWeight="SemiBold" FontSize="12" />
-                                </Button>
-                                <Button Classes="tab-btn"
-                                        Classes.accent="{Binding IsTransfersTabActive}"
-                                        Command="{Binding ShowTransfersTabCommand}"
-                                        Padding="10,6">
-                                    <TextBlock Text="🔄 تحويل" FontWeight="SemiBold" FontSize="12" />
-                                </Button>
-                            </StackPanel>
-
-                            <!-- Close Button (✕) -->
-                            <Button Grid.Column="2"
-                                    Classes="ghost"
-                                    Command="{Binding CloseActionDialogCommand}"
-                                    Width="36" Height="36"
-                                    HorizontalContentAlignment="Center"
-                                    VerticalContentAlignment="Center"
-                                    FontSize="16" FontWeight="Bold"
-                                    ToolTip.Tip="إغلاق النافذة">
-                                <TextBlock Text="✕" />
-                            </Button>
-                        </Grid>
-                    </Border>
-
-                    <!-- Dialog Body (Scrollable) -->
-                    <ScrollViewer Grid.Row="1" Padding="20,18" VerticalScrollBarVisibility="Auto">
-                        <Panel>
-                            <!-- FORM 0: Party Voucher (سند قبض / صرف) -->
-                            <StackPanel Spacing="16" IsVisible="{Binding IsVouchersTabActive}">
-                                <!-- Row 1: Direction & Payment Method -->
-                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="20">
-                                    <!-- Direction -->
-                                    <StackPanel Grid.Column="0" Spacing="6">
-                                        <TextBlock Text="نوع السند والاتجاه *" Classes="caption muted" />
+            <components:ModalDialog.Body>
+                <Panel>
+                    <!-- FORM 0: Party Voucher (سند قبض / صرف) -->
+                    <StackPanel Spacing="16" IsVisible="{Binding IsVouchersTabActive}">
+                        <!-- Row 1: Direction & Payment Method -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="20">
+                            <!-- Direction -->
+                            <StackPanel Grid.Column="0" Spacing="6">
+                                <TextBlock Text="نوع السند والاتجاه *" Classes="caption muted" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Button Classes="tab-btn"
+                                            Classes.accent="{Binding IsInflowDirection}"
+                                            Command="{Binding SelectInflowDirectionCommand}"
+                                            Padding="14,8">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <Button Classes="tab-btn"
-                                                    Classes.accent="{Binding IsInflowDirection}"
-                                                    Command="{Binding SelectInflowDirectionCommand}"
-                                                    Padding="14,8">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="📥" FontSize="14" />
-                                                    <TextBlock Text="تحصيل من عميل (وارد)" FontWeight="SemiBold" />
-                                                </StackPanel>
-                                            </Button>
-                                            <Button Classes="tab-btn"
-                                                    Classes.accent="{Binding IsOutflowDirection}"
-                                                    Command="{Binding SelectOutflowDirectionCommand}"
-                                                    Padding="14,8">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="📤" FontSize="14" />
-                                                    <TextBlock Text="سداد لمورد (صادر)" FontWeight="SemiBold" />
-                                                </StackPanel>
-                                            </Button>
+                                            <TextBlock Text="📥" FontSize="14" />
+                                            <TextBlock Text="تحصيل من عميل (وارد)" FontWeight="SemiBold" />
                                         </StackPanel>
-                                    </StackPanel>
-
-                                    <!-- Payment Method (Cash vs Wallets) -->
-                                    <StackPanel Grid.Column="1" Spacing="6">
-                                        <TextBlock Text="طريقة الاستلام / الدفع *" Classes="caption muted" />
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <Button Classes="tab-btn"
-                                                    Classes.accent="{Binding IsCashMethod}"
-                                                    Command="{Binding SelectCashCommand}"
-                                                    Padding="14,8">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="💵" FontSize="14" />
-                                                    <TextBlock Text="كاش (الخزينة)" FontWeight="Bold" />
-                                                </StackPanel>
-                                            </Button>
-                                            <Button Classes="tab-btn"
-                                                    Classes.accent="{Binding IsVodafoneCashActive}"
-                                                    Command="{Binding SelectVodafoneCashCommand}"
-                                                    Padding="14,8">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="📱" FontSize="14" />
-                                                    <TextBlock Text="فودافون كاش" FontWeight="SemiBold" />
-                                                </StackPanel>
-                                            </Button>
-                                            <Button Classes="tab-btn"
-                                                    Classes.accent="{Binding IsInstapayActive}"
-                                                    Command="{Binding SelectInstapayCommand}"
-                                                    Padding="14,8">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="⚡" FontSize="14" />
-                                                    <TextBlock Text="انستاباي" FontWeight="SemiBold" />
-                                                </StackPanel>
-                                            </Button>
+                                    </Button>
+                                    <Button Classes="tab-btn"
+                                            Classes.accent="{Binding IsOutflowDirection}"
+                                            Command="{Binding SelectOutflowDirectionCommand}"
+                                            Padding="14,8">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="📤" FontSize="14" />
+                                            <TextBlock Text="سداد لمورد (صادر)" FontWeight="SemiBold" />
                                         </StackPanel>
-                                    </StackPanel>
-                                </Grid>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
 
-                                <!-- Row 2: Party Selection & Outstanding Balance Quick Fill -->
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" VerticalAlignment="Center">
-                                    <StackPanel Grid.Column="0" Spacing="4">
-                                        <TextBlock Text="العميل المحصَّل منه *"
-                                                   Classes="caption muted"
-                                                   IsVisible="{Binding IsInflowDirection}" />
-                                        <TextBlock Text="المورد المسدَّد له *"
-                                                   Classes="caption muted"
-                                                   IsVisible="{Binding IsOutflowDirection}" />
-                                        <ComboBox ItemsSource="{Binding FilteredParties}"
-                                                  SelectedItem="{Binding Party, Mode=TwoWay}"
-                                                  PlaceholderText="ابحث أو اختر..."
-                                                  HorizontalAlignment="Stretch"
-                                                  Height="38">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:PartyOption">
-                                                    <TextBlock Text="{Binding Name}" />
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                    </StackPanel>
-
-                                    <!-- Outstanding Balance Badge -->
-                                    <Border Grid.Column="1" Classes="surface" Padding="14,8" VerticalAlignment="Bottom"
-                                            IsVisible="{Binding Outstanding, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <TextBlock Text="حالة الرصيد:" Classes="caption muted" VerticalAlignment="Center" />
-                                            <TextBlock Text="{Binding Outstanding}" FontWeight="Bold" VerticalAlignment="Center" />
+                            <!-- Payment Method (Cash vs Wallets) -->
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Text="طريقة الاستلام / الدفع *" Classes="caption muted" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="tab-btn"
+                                            Classes.accent="{Binding IsCashMethod}"
+                                            Command="{Binding SelectCashCommand}"
+                                            Padding="14,8">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="💵" FontSize="14" />
+                                            <TextBlock Text="كاش (الخزينة)" FontWeight="Bold" />
                                         </StackPanel>
-                                    </Border>
-
-                                    <!-- Quick Fill Full Outstanding Button -->
-                                    <Button Grid.Column="2" Classes="accent"
-                                            Command="{Binding FillFullOutstandingCommand}"
-                                            VerticalAlignment="Bottom"
-                                            Height="38" Padding="16,0"
-                                            IsVisible="{Binding Outstanding, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                            ToolTip.Tip="سداد كامل المبلغ المفتوح بنقرة واحدة">
+                                    </Button>
+                                    <Button Classes="tab-btn"
+                                            Classes.accent="{Binding IsVodafoneCashActive}"
+                                            Command="{Binding SelectVodafoneCashCommand}"
+                                            Padding="14,8">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="📱" FontSize="14" />
+                                            <TextBlock Text="فودافون كاش" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Classes="tab-btn"
+                                            Classes.accent="{Binding IsInstapayActive}"
+                                            Command="{Binding SelectInstapayCommand}"
+                                            Padding="14,8">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                             <TextBlock Text="⚡" FontSize="14" />
-                                            <TextBlock Text="سداد كامل المستحق" FontWeight="Bold" />
+                                            <TextBlock Text="انستاباي" FontWeight="SemiBold" />
                                         </StackPanel>
                                     </Button>
-                                </Grid>
-
-                                <!-- Row 3: Amount, Reference & Confirm Post Button -->
-                                <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="12" VerticalAlignment="Center">
-                                    <!-- Amount Input -->
-                                    <StackPanel Grid.Column="0" Spacing="4">
-                                        <TextBlock Text="المبلغ (ج.م) *" Classes="caption muted" />
-                                        <TextBox Text="{Binding Amount, Mode=TwoWay}"
-                                                 PlaceholderText="0.00"
-                                                 FontSize="16" FontWeight="Bold"
-                                                 Height="40"
-                                                 VerticalContentAlignment="Center" />
-                                    </StackPanel>
-
-                                    <!-- Reference / Notes Input -->
-                                    <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Text="رقم الإيصال / مرجع التحويل أو هاتف المحفظة (اختياري)" Classes="caption muted" />
-                                        <TextBox Text="{Binding Reference, Mode=TwoWay}"
-                                                 PlaceholderText="مثال: تحويل فودافون كاش #123456 أو إيصال تسليم"
-                                                 Height="40"
-                                                 VerticalContentAlignment="Center" />
-                                    </StackPanel>
-
-                                    <!-- Post Button -->
-                                    <Button Grid.Column="2" Classes="accent"
-                                            Command="{Binding PostCommand}"
-                                            VerticalAlignment="Bottom"
-                                            Height="40" Padding="24,0">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <TextBlock Text="✓" FontSize="16" FontWeight="Bold" />
-                                            <TextBlock Text="تأكيد وترحيل السند" FontWeight="Bold" FontSize="14" />
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
-                            </StackPanel>
-
-                            <!-- FORM 1: Direct Expense / Cash Movement -->
-                            <StackPanel Spacing="16" IsVisible="{Binding IsMovementsTabActive}">
-                                <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-                                    <StackPanel Grid.Column="0" Spacing="4">
-                                        <TextBlock Text="نوع الحركة *" Classes="caption muted" />
-                                        <ComboBox ItemsSource="{Binding MovementKinds}"
-                                                  SelectedItem="{Binding SelectedMovementKind, Mode=TwoWay}"
-                                                  HorizontalAlignment="Stretch" Height="38">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:MovementKindOption">
-                                                    <TextBlock Text="{Binding Label}" />
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Text="تصنيف المصروف *" Classes="caption muted" />
-                                        <ComboBox ItemsSource="{Binding ExpenseCategories}"
-                                                  SelectedItem="{Binding SelectedExpenseCategory, Mode=TwoWay}"
-                                                  HorizontalAlignment="Stretch" Height="38">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:ExpenseCategoryOption">
-                                                    <TextBlock Text="{Binding Label}" />
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                    </StackPanel>
-                                </Grid>
-
-                                <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-                                    <StackPanel Grid.Column="0" Spacing="4">
-                                        <TextBlock Text="الحساب المدفوع منه / إليه *" Classes="caption muted" />
-                                        <ComboBox ItemsSource="{Binding AllAccounts}"
-                                                  SelectedItem="{Binding MovementAccount, Mode=TwoWay}"
-                                                  HorizontalAlignment="Stretch" Height="38">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:AccountRow">
-                                                    <TextBlock Text="{Binding Name}" />
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Text="المبلغ (ج.م) *" Classes="caption muted" />
-                                        <TextBox Text="{Binding MovementAmount, Mode=TwoWay}"
-                                                 PlaceholderText="0.00"
-                                                 FontSize="16" FontWeight="Bold"
-                                                 Height="38"
-                                                 VerticalContentAlignment="Center" />
-                                    </StackPanel>
-                                </Grid>
-
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="البيان / الملاحظات" Classes="caption muted" />
-                                    <TextBox Text="{Binding MovementNotes, Mode=TwoWay}"
-                                             PlaceholderText="مثال: فاتورة كهرباء شهر أكتوبر..."
-                                             Height="38"
-                                             VerticalContentAlignment="Center" />
                                 </StackPanel>
-
-                                <Button Classes="accent"
-                                        Command="{Binding PostMovementCommand}"
-                                        HorizontalAlignment="Right"
-                                        Height="40" Padding="24,0">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="✓" FontSize="16" FontWeight="Bold" />
-                                        <TextBlock Text="تسجيل وترحيل المصروف" FontWeight="Bold" FontSize="14" />
-                                    </StackPanel>
-                                </Button>
                             </StackPanel>
-
-                            <!-- FORM 2: Treasury Account Transfer -->
-                            <StackPanel Spacing="16" IsVisible="{Binding IsTransfersTabActive}">
-                                <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-                                    <StackPanel Grid.Column="0" Spacing="4">
-                                        <TextBlock Text="من حساب (المصدر) *" Classes="caption muted" />
-                                        <ComboBox ItemsSource="{Binding AllAccounts}"
-                                                  SelectedItem="{Binding TransferFromAccount, Mode=TwoWay}"
-                                                  HorizontalAlignment="Stretch" Height="38">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:AccountRow">
-                                                    <TextBlock Text="{Binding Name}" />
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Text="إلى حساب (الوجهة) *" Classes="caption muted" />
-                                        <ComboBox ItemsSource="{Binding AllAccounts}"
-                                                  SelectedItem="{Binding TransferToAccount, Mode=TwoWay}"
-                                                  HorizontalAlignment="Stretch" Height="38">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:AccountRow">
-                                                    <TextBlock Text="{Binding Name}" />
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                    </StackPanel>
-                                </Grid>
-
-                                <Grid ColumnDefinitions="200,*" ColumnSpacing="16">
-                                    <StackPanel Grid.Column="0" Spacing="4">
-                                        <TextBlock Text="المبلغ المحول (ج.م) *" Classes="caption muted" />
-                                        <TextBox Text="{Binding TransferAmount, Mode=TwoWay}"
-                                                 PlaceholderText="0.00"
-                                                 FontSize="16" FontWeight="Bold"
-                                                 Height="38"
-                                                 VerticalContentAlignment="Center" />
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Text="ملاحظات التحويل" Classes="caption muted" />
-                                        <TextBox Text="{Binding TransferNotes, Mode=TwoWay}"
-                                                 PlaceholderText="مثال: توريد كاش إلى المحفظة الإلكترونية..."
-                                                 Height="38"
-                                                 VerticalContentAlignment="Center" />
-                                    </StackPanel>
-                                </Grid>
-
-                                <Button Classes="accent"
-                                        Command="{Binding PostTransferCommand}"
-                                        HorizontalAlignment="Right"
-                                        Height="40" Padding="24,0">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="✓" FontSize="16" FontWeight="Bold" />
-                                        <TextBlock Text="تأكيد وترحيل التحويل" FontWeight="Bold" FontSize="14" />
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-                        </Panel>
-                    </ScrollViewer>
-
-                    <!-- Dialog Footer -->
-                    <Border Grid.Row="2"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="0,1,0,0"
-                            CornerRadius="0,0,8,8"
-                            Padding="20,10">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Grid.Column="0"
-                                       Text="{Binding Status}"
-                                       Classes="caption strong"
-                                       VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis" />
-                            <Button Grid.Column="1"
-                                    Classes="ghost"
-                                    Content="إغلاق"
-                                    Command="{Binding CloseActionDialogCommand}"
-                                    Padding="16,6" />
                         </Grid>
-                    </Border>
+
+                        <!-- Row 2: Party Selection & Outstanding Balance Quick Fill -->
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" VerticalAlignment="Center">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="العميل المحصَّل منه *"
+                                           Classes="caption muted"
+                                           IsVisible="{Binding IsInflowDirection}" />
+                                <TextBlock Text="المورد المسدَّد له *"
+                                           Classes="caption muted"
+                                           IsVisible="{Binding IsOutflowDirection}" />
+                                <ComboBox ItemsSource="{Binding FilteredParties}"
+                                          SelectedItem="{Binding Party, Mode=TwoWay}"
+                                          PlaceholderText="ابحث أو اختر..."
+                                          HorizontalAlignment="Stretch"
+                                          Height="38">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:PartyOption">
+                                            <TextBlock Text="{Binding Name}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Outstanding Balance Badge -->
+                            <components:KpiTile Grid.Column="1" IsVisible="{Binding Outstanding, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Label="حالة الرصيد:" Value="{Binding Outstanding}" />
+
+                            <!-- Quick Fill Full Outstanding Button -->
+                            <Button Grid.Column="2" Classes="accent"
+                                    Command="{Binding FillFullOutstandingCommand}"
+                                    VerticalAlignment="Bottom"
+                                    Height="38" Padding="16,0"
+                                    IsVisible="{Binding Outstanding, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                    ToolTip.Tip="سداد كامل المبلغ المفتوح بنقرة واحدة">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="⚡" FontSize="14" />
+                                    <TextBlock Text="سداد كامل المستحق" FontWeight="Bold" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- Row 3: Amount, Reference & Confirm Post Button -->
+                        <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="12" VerticalAlignment="Center">
+                            <!-- Amount Input -->
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="المبلغ (ج.م) *" Classes="caption muted" />
+                                <TextBox Text="{Binding Amount, Mode=TwoWay}"
+                                         PlaceholderText="0.00"
+                                         FontSize="16" FontWeight="Bold"
+                                         Height="40"
+                                         VerticalContentAlignment="Center" />
+                            </StackPanel>
+
+                            <!-- Reference / Notes Input -->
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="رقم الإيصال / مرجع التحويل أو هاتف المحفظة (اختياري)" Classes="caption muted" />
+                                <TextBox Text="{Binding Reference, Mode=TwoWay}"
+                                         PlaceholderText="مثال: تحويل فودافون كاش #123456 أو إيصال تسليم"
+                                         Height="40"
+                                         VerticalContentAlignment="Center" />
+                            </StackPanel>
+
+                            <!-- Post Button -->
+                            <Button Grid.Column="2" Classes="accent"
+                                    Command="{Binding PostCommand}"
+                                    VerticalAlignment="Bottom"
+                                    Height="40" Padding="24,0">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="✓" FontSize="16" FontWeight="Bold" />
+                                    <TextBlock Text="تأكيد وترحيل السند" FontWeight="Bold" FontSize="14" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- FORM 1: Direct Expense / Cash Movement -->
+                    <StackPanel Spacing="16" IsVisible="{Binding IsMovementsTabActive}">
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="نوع الحركة *" Classes="caption muted" />
+                                <ComboBox ItemsSource="{Binding MovementKinds}"
+                                          SelectedItem="{Binding SelectedMovementKind, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch" Height="38">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:MovementKindOption">
+                                            <TextBlock Text="{Binding Label}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="تصنيف المصروف *" Classes="caption muted" />
+                                <ComboBox ItemsSource="{Binding ExpenseCategories}"
+                                          SelectedItem="{Binding SelectedExpenseCategory, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch" Height="38">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ExpenseCategoryOption">
+                                            <TextBlock Text="{Binding Label}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="الحساب المدفوع منه / إليه *" Classes="caption muted" />
+                                <ComboBox ItemsSource="{Binding AllAccounts}"
+                                          SelectedItem="{Binding MovementAccount, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch" Height="38">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AccountRow">
+                                            <TextBlock Text="{Binding Name}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="المبلغ (ج.م) *" Classes="caption muted" />
+                                <TextBox Text="{Binding MovementAmount, Mode=TwoWay}"
+                                         PlaceholderText="0.00"
+                                         FontSize="16" FontWeight="Bold"
+                                         Height="38"
+                                         VerticalContentAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="البيان / الملاحظات" Classes="caption muted" />
+                            <TextBox Text="{Binding MovementNotes, Mode=TwoWay}"
+                                     PlaceholderText="مثال: فاتورة كهرباء شهر أكتوبر..."
+                                     Height="38"
+                                     VerticalContentAlignment="Center" />
+                        </StackPanel>
+
+                        <Button Classes="accent"
+                                Command="{Binding PostMovementCommand}"
+                                HorizontalAlignment="Right"
+                                Height="40" Padding="24,0">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="✓" FontSize="16" FontWeight="Bold" />
+                                <TextBlock Text="تسجيل وترحيل المصروف" FontWeight="Bold" FontSize="14" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- FORM 2: Treasury Account Transfer -->
+                    <StackPanel Spacing="16" IsVisible="{Binding IsTransfersTabActive}">
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="من حساب (المصدر) *" Classes="caption muted" />
+                                <ComboBox ItemsSource="{Binding AllAccounts}"
+                                          SelectedItem="{Binding TransferFromAccount, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch" Height="38">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AccountRow">
+                                            <TextBlock Text="{Binding Name}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="إلى حساب (الوجهة) *" Classes="caption muted" />
+                                <ComboBox ItemsSource="{Binding AllAccounts}"
+                                          SelectedItem="{Binding TransferToAccount, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch" Height="38">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AccountRow">
+                                            <TextBlock Text="{Binding Name}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="200,*" ColumnSpacing="16">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="المبلغ المحول (ج.م) *" Classes="caption muted" />
+                                <TextBox Text="{Binding TransferAmount, Mode=TwoWay}"
+                                         PlaceholderText="0.00"
+                                         FontSize="16" FontWeight="Bold"
+                                         Height="38"
+                                         VerticalContentAlignment="Center" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="ملاحظات التحويل" Classes="caption muted" />
+                                <TextBox Text="{Binding TransferNotes, Mode=TwoWay}"
+                                         PlaceholderText="مثال: توريد كاش إلى المحفظة الإلكترونية..."
+                                         Height="38"
+                                         VerticalContentAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Button Classes="accent"
+                                Command="{Binding PostTransferCommand}"
+                                HorizontalAlignment="Right"
+                                Height="40" Padding="24,0">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="✓" FontSize="16" FontWeight="Bold" />
+                                <TextBlock Text="تأكيد وترحيل التحويل" FontWeight="Bold" FontSize="14" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Panel>
+            </components:ModalDialog.Body>
+
+            <components:ModalDialog.Footer>
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding Status}"
+                               Classes="caption strong"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Column="1"
+                            Classes="ghost"
+                            Content="إغلاق"
+                            Command="{Binding CloseActionDialogCommand}"
+                            Padding="16,6" />
                 </Grid>
-            </Border>
-        </Grid>
+            </components:ModalDialog.Footer>
+        </components:ModalDialog>
     </Grid>
 </UserControl>

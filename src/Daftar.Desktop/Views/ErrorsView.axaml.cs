@@ -23,6 +23,6 @@ public partial class ErrorsView : UserControl
             return;
 
         _loaded = true;
-        await vm.InitializeAsync();
+        await ScreenLoad.Run(vm.InitializeAsync);
     }
 }

@@ -23,6 +23,6 @@ public partial class ProductsView : UserControl
             return;
 
         _loaded = true;
-        await vm.LoadAsync();
+        await ScreenLoad.Run(vm.LoadAsync, m => vm.Status = m);
     }
 }

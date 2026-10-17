@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="using:Daftar.Views.Components"
+             x:Class="Daftar.Views.Components.SearchBox"
+             Classes.large="{Binding Large, RelativeSource={RelativeSource Self}}"
+             FlowDirection="RightToLeft">
+
+    <!--
+        The magnifier lives inside the field, which is the whole reason this is a control rather
+        than a style: an icon inside a TextBox is content, not a property, so no style reaches it.
+
+        The two sizes are a class rather than a converter, so the theme tokens stay in the styles
+        where they can be read and changed.
+    -->
+    <UserControl.Styles>
+        <Style Selector="components|SearchBox TextBox">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="components|SearchBox.large TextBox">
+            <Setter Property="Height" Value="{StaticResource SearchHeight}" />
+            <Setter Property="FontSize" Value="{StaticResource FontSizeSubtitle}" />
+        </Style>
+
+        <Style Selector="components|SearchBox PathIcon">
+            <Setter Property="Width" Value="15" />
+            <Setter Property="Height" Value="15" />
+            <Setter Property="Margin" Value="10,0" />
+            <Setter Property="Opacity" Value="0.6" />
+        </Style>
+        <Style Selector="components|SearchBox.large PathIcon">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Margin" Value="12,0" />
+        </Style>
+    </UserControl.Styles>
+
+    <TextBox x:Name="Field"
+             Text="{Binding Text, RelativeSource={RelativeSource AncestorType=components:SearchBox}, Mode=TwoWay}"
+             PlaceholderText="{Binding Placeholder, RelativeSource={RelativeSource AncestorType=components:SearchBox}}">
+        <TextBox.InnerLeftContent>
+            <PathIcon Data="{StaticResource IconSearch}" />
+        </TextBox.InnerLeftContent>
+    </TextBox>
+</UserControl>

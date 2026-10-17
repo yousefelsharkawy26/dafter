@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.VisualTree;
+using CommunityToolkit.Mvvm.Input;
 using Daftar.Infrastructure;
 using Daftar.Infrastructure.Security;
 using Daftar.ViewModels;
@@ -112,22 +113,54 @@ public sealed class ProductTileThemeTests : IAsyncLifetime, IDisposable
 
     // ---------- arrangement ----------
 
+    // The screens render ProductTileItem, not their own product type, so the arrangement builds
+    // the same tile the ViewModel builds. Anything less and these tests would be checking a shape
+    // the screen never sees.
+
     private static Action<Control> SellProduct(bool inStock) => view =>
     {
         var option = new ProductOption(1, "SKU-1", "أرز مصري فاخر");
-        option.AvailableUnits.Add(new CartUnitOption(1, "كجم", 1m, 42m, 35m, inStock ? 12m : 0m));
+        var unit = new CartUnitOption(1, "كجم", 1m, 42m, 35m, inStock ? 12m : 0m);
+        option.AvailableUnits.Add(unit);
+        option.SelectedUnit = unit;
+
+        ((SellViewModel)view.DataContext!).FilteredProducts.Add(new ProductTileItem(
+            option, 1, "SKU-1", "أرز مصري فاخر", ProductTileVariant.Sell,
+            [new ProductTileUnit(1, "كجم", 1m, 42m, 35m, inStock ? 12m : 0m)],
+            u => u.Price % 1 == 0 ? $"{u.Price:N0} ج" : $"{u.Price:N2} ج",
+            _ => { },
+            new RelayCommand(() => { })));
+    };
+
+    private static Action<Control> SellTwoUnits => view =>
+    {
+        var option = new ProductOption(1, "SKU-1", "أرز مصري فاخر");
+        option.AvailableUnits.Add(new CartUnitOption(1, "كجم", 1m, 42m, 35m, 12m));
+        option.AvailableUnits.Add(new CartUnitOption(2, "كرتونة", 10m, 380m, 320m, 2m));
         option.SelectedUnit = option.AvailableUnits[0];
 
-        ((SellViewModel)view.DataContext!).FilteredProducts.Add(option);
+        ((SellViewModel)view.DataContext!).FilteredProducts.Add(new ProductTileItem(
+            option, 1, "SKU-1", "أرز مصري فاخر", ProductTileVariant.Sell,
+            [new ProductTileUnit(1, "كجم", 1m, 42m, 35m, 12m),
+             new ProductTileUnit(2, "كرتونة", 10m, 380m, 320m, 2m)],
+            u => u.Price % 1 == 0 ? $"{u.Price:N0} ج" : $"{u.Price:N2} ج",
+            _ => { },
+            new RelayCommand(() => { })));
     };
 
     private static Action<Control> ReceiveProduct(bool inStock) => view =>
     {
         var option = new ReceiveProductOption(1, "SKU-2", "زيت زيتون بكر");
-        option.AvailableUnits.Add(new ReceiveUnitOption(1, "لتر", 1m, 60m, inStock ? 5m : 0m));
-        option.SelectedUnit = option.AvailableUnits[0];
+        var unit = new ReceiveUnitOption(1, "لتر", 1m, 60m, inStock ? 5m : 0m);
+        option.AvailableUnits.Add(unit);
+        option.SelectedUnit = unit;
 
-        ((ReceiveViewModel)view.DataContext!).FilteredProducts.Add(option);
+        ((ReceiveViewModel)view.DataContext!).FilteredProducts.Add(new ProductTileItem(
+            option, 1, "SKU-2", "زيت زيتون بكر", ProductTileVariant.Receive,
+            [new ProductTileUnit(1, "لتر", 1m, 0m, 60m, inStock ? 5m : 0m)],
+            u => u.PurchasePrice > 0 ? $"{u.PurchasePrice:N2} ج.م" : "سعر غير محدد",
+            _ => { },
+            new RelayCommand(() => { })));
     };
 
     private Control SellView() => new Views.SellView { DataContext = new SellViewModel(_services) };
@@ -215,6 +248,77 @@ public sealed class ProductTileThemeTests : IAsyncLifetime, IDisposable
         });
     }
 
+    [Fact]
+    public void The_Sell_Tile_Names_Its_Unit_And_Says_What_Is_On_Hand()
+    {
+        // Found by looking, not by reading the markup: on the real screen the unit picker was
+        // empty and neither the "/ unit" suffix nor the on-hand figure appeared, while the price
+        // was perfectly correct and every other test here passed. The price was enough to make the
+        // tile look healthy.
+        Inspect(SellView, SellProduct(inStock: true), tiles =>
+        {
+            var tile = Assert.Single(tiles);
+            var texts = tile.GetVisualDescendants().OfType<TextBlock>().ToArray();
+
+            Assert.Contains(texts, t => t.Text == "/ كجم");
+            Assert.Contains(texts, t => t.Text == "متاح: 12");
+        });
+    }
+
+    [Fact]
+    public void The_Unit_Picker_Shows_The_Unit_It_Is_On()
+    {
+        // An empty white box with a chevron in it tells the cashier nothing about what they are
+        // about to sell, and it looks like the control failed to load rather than like a choice.
+        //
+        // Two units, or the picker is not shown at all and this passes against nothing. It did.
+        Inspect(SellView, SellTwoUnits, tiles =>
+        {
+            var picker = Assert.Single(tiles[0].GetVisualDescendants().OfType<ComboBox>());
+
+            Assert.True(picker.IsEffectivelyVisible);
+            Assert.NotNull(picker.SelectedItem);
+
+            // The tile opens on the first unit, so that is what the box must be showing.
+            Assert.Equal("كجم", ((ProductTileUnit)picker.SelectedItem!).UnitName);
+
+            // And the name is actually painted, not merely selected: the box was empty on screen
+            // while SelectedItem was perfectly set, which is the whole failure.
+            //
+            // Dark as well as present. The unit name was rendered white on a white picker, so the
+            // box looked empty while every assertion about its content passed.
+            var labels = picker.GetVisualDescendants().OfType<TextBlock>()
+                .Where(t => t.IsEffectivelyVisible && t.Text is { Length: > 0 })
+                .ToArray();
+
+            Assert.NotEmpty(labels);
+            Assert.All(labels, t => Assert.NotEqual(Colors.White, ColourOf(t.Foreground)));
+            Assert.Contains(labels, t => t.Text == "كجم");
+        });
+    }
+
+    [Fact]
+    public void The_Tile_Fills_The_Cell_It_Is_Laid_Out_In()
+    {
+        // The square is now a UserControl wrapping the Button, which is one more thing between the
+        // grid and the control the cashier clicks. Every other test here can pass on a tile that
+        // has collapsed to a few pixels: the colour of a square you cannot see is still correct.
+        // So this asks the question the rest of them cannot.
+        Inspect(SellView, SellProduct(inStock: true), tiles =>
+        {
+            var tile = Assert.Single(tiles);
+
+            Assert.True(tile.Bounds.Width > 100, $"width was {tile.Bounds.Width}");
+            Assert.True(tile.Bounds.Height > 60, $"height was {tile.Bounds.Height}");
+
+            // The square and the control that wraps it have to agree, or the grid thinks it
+            // laid out a full cell while the button inside drew a fraction of one.
+            var wrapper = tile.GetVisualAncestors().OfType<UserControl>().First();
+            Assert.Equal(wrapper.Bounds.Width, tile.Bounds.Width, 2);
+            Assert.Equal(wrapper.Bounds.Height, tile.Bounds.Height, 2);
+        });
+    }
+
     // ---------- shared assertion ----------
 
     private static void AssertAllWhite(Button[] tiles)
@@ -226,6 +330,19 @@ public sealed class ProductTileThemeTests : IAsyncLifetime, IDisposable
         foreach (var tile in tiles)
         foreach (var text in tile.GetVisualDescendants().OfType<TextBlock>())
         {
+            // The unit picker is a white box sitting inside a blue tile, so its own text has to be
+            // dark — that is the one place on the tile where white would be invisible, and it was
+            // white for a while, which is why the picker looked empty. Everything else is on blue
+            // and has to be white.
+            if (text.GetVisualAncestors().OfType<ComboBox>().Any())
+                continue;
+
+            // Badges are pale pills of their own sitting on the blue, so their text is dark ink by
+            // design — the same exception as the picker, and for the same reason. Their legibility
+            // is a separate contract with its own measured floor; see TileBadgeLegibilityTests.
+            if (text.GetVisualAncestors().OfType<Border>().Any(b => b.Classes.Contains("badge")))
+                continue;
+
             var colour = ColourOf(text.Foreground);
             if (colour is not { } c || c == Colors.White)
                 continue;

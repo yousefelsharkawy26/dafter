@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using Avalonia.Headless;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Daftar.Infrastructure;
@@ -110,6 +112,59 @@ public sealed class ViewRenderingTests
         });
     }
 
+    /// <summary>
+    /// The five headline cards are one row of one size.
+    ///
+    /// Two of the five are hand-written rather than built from the tile, so they do not inherit the
+    /// tile's figure size. When the tile's figure was resized to clear the contrast floor they were
+    /// left behind at the old size, and the row showed its second and third numbers a step smaller
+    /// than its first, fourth and fifth. No view model can see that and no bind path is wrong, so
+    /// it is caught here or it is not caught.
+    ///
+    /// A figure in this row is identified by being bold: the labels are muted, the icons are not
+    /// bold, and the badge in the margin card's note is only semi-bold. The floor asserted is the
+    /// WCAG large-text line, because that is the reason the size is what it is -- at 18.66 DIP a
+    /// colour stops owing 4.5 and starts owing 3.0.
+    /// </summary>
+    [Fact]
+    public void Every_Figure_In_The_Reports_Kpi_Strip_Is_One_Size()
+    {
+        AvaloniaUi.Run(window =>
+        {
+            var vm = new ViewModels.ReportsViewModel(Container());
+
+            var view = new Views.ReportsView { DataContext = vm };
+            window.Content = view;
+            window.Show();
+            AvaloniaUi.Settle();
+
+            // Granted after the view is attached, because ReportsView recomputes the permission
+            // from the signed-in role while it loads: a value set beforehand is overwritten and the
+            // two right-hand cards -- the ones this test is about -- never appear at all.
+            vm.CanViewCost = true;
+            AvaloniaUi.Settle();
+
+            Capture(window, "reports-cost");
+
+            var strip = view.GetVisualDescendants().OfType<UniformGrid>().Single();
+
+            var figures = strip.GetVisualDescendants()
+                .OfType<TextBlock>()
+                .Where(figure => figure.FontWeight >= FontWeight.Bold)
+                .ToList();
+
+            Assert.Equal(5, figures.Count);
+
+            Assert.All(figures, figure =>
+                Assert.True(figure.IsEffectivelyVisible, $"\"{figure.Text}\" is in the strip but not shown"));
+
+            var size = Assert.Single(figures.Select(figure => figure.FontSize).Distinct());
+
+            Assert.True(size >= 18.66,
+                $"the strip figures are {size} DIP, which is not large text and owes a 4.5 floor");
+        });
+    }
+
     [Fact]
     public void The_Settings_Screen_Renders()
     {
@@ -152,6 +207,54 @@ public sealed class ViewRenderingTests
 
             Assert.Empty(offenders);
         });
+    }
+
+    /// <summary>
+    /// The start screen's low-stock tile prints its number in a size of its own and the word beside
+    /// it smaller, in two text blocks. Only the number was ever bound; the word was the literal
+    /// "أصناف", so at one product the tile read "1 أصناف" and could not move with the count at all.
+    ///
+    /// <para>
+    /// This is the shape a counted-noun sweep misses: the word is not inside a StringFormat, it is a
+    /// text block of its own. The count set here is two because that is the only count whose form
+    /// differs from zero and one as well as from three and up -- a word that never moved would still
+    /// have read correctly at any other value.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void The_Start_Screen_Low_Stock_Figure_And_Its_Noun_Agree()
+    {
+        var rendered = new List<string>();
+
+        AvaloniaUi.Run(_ =>
+        {
+            var vm = new ViewModels.MainWindowViewModel { Services = Container() };
+
+            var window = new Views.MainWindow { DataContext = vm };
+            window.Show();
+            AvaloniaUi.Settle();
+            AvaloniaUi.Settle();
+
+            // Set after the start screen has loaded: the load writes this figure, and a value set
+            // beforehand would be settled back to the one it read.
+            vm.Stats!.LowStockCount = 2;
+            AvaloniaUi.Settle();
+
+            Capture(window, "start-menu-lowstock");
+
+            // The tile by its label, so the assertion is about this tile and not about any other
+            // number the start screen happens to show.
+            var tile = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
+                button => button.GetVisualDescendants().OfType<TextBlock>()
+                    .Any(block => block.Text == "تنبيهات النواقص"));
+
+            rendered.AddRange(tile.GetVisualDescendants()
+                .OfType<TextBlock>()
+                .Select(block => block.Text ?? string.Empty));
+        });
+
+        Assert.Contains("2", rendered);
+        Assert.Contains("صنفان", rendered);
     }
 
     // ---------- helpers ----------

@@ -35,7 +35,15 @@ public partial class SellViewModel : ObservableObject
 
     public ObservableCollection<ProductOption> Products { get; } = [];
 
-    public ObservableCollection<ProductOption> FilteredProducts { get; } = [];
+    /// <summary>
+    /// Tiles, not options: this is the list the shared ProductTileGrid renders, and it is the only
+    /// one the view sees. The tiles are built once per product at load time and filtering just
+    /// re-picks them, so typing in the search box allocates nothing.
+    /// </summary>
+    public ObservableCollection<ProductTileItem> FilteredProducts { get; } = [];
+
+    /// <summary>One tile per product id, so ApplyProductFilter reuses rather than rebuilds.</summary>
+    private readonly Dictionary<int, ProductTileItem> _tilesByProductId = new();
 
     public ObservableCollection<CartLine> Cart { get; } = [];
 
@@ -239,9 +247,37 @@ public partial class SellViewModel : ObservableObject
             option.SelectedUnit = option.AvailableUnits.FirstOrDefault()!;
 
             Products.Add(option);
+
+            // The tile copies the units rather than sharing them, so a unit picked in the grid has
+            // to be written back to the option the cart reads. Without that handshake the cashier
+            // would see one unit on the square and add another to the cart.
+            _tilesByProductId[option.ProductId] = new ProductTileItem(
+                source: option,
+                productId: option.ProductId,
+                sku: option.Sku,
+                name: option.Name,
+                variant: ProductTileVariant.Sell,
+                units: option.AvailableUnits.Select(ToTileUnit),
+                priceFormatter: u => u.Price % 1 == 0 ? $"{u.Price:N0} ج" : $"{u.Price:N2} ج",
+                unitSelected: u => option.SelectedUnit =
+                    option.AvailableUnits.FirstOrDefault(x => x.ProductUnitId == u.ProductUnitId),
+                selectCommand: SelectTileCommand);
         }
 
         ApplyProductFilter();
+    }
+
+    private static ProductTileUnit ToTileUnit(CartUnitOption u) =>
+        new(u.ProductUnitId, u.UnitName, u.UnitFactor, u.Price, u.PurchasePrice, u.OnHand);
+
+    /// <summary>Runs when a tile is tapped. Resolves back to the option and reuses the existing path.</summary>
+    [RelayCommand]
+    private void SelectTile(ProductTileItem? tile)
+    {
+        if (tile?.Source is ProductOption option)
+        {
+            SelectProduct(option);
+        }
     }
 
     /// <summary>Stock on hand across sellable batches, computed from the pre-loaded balance rows.</summary>
@@ -299,7 +335,7 @@ public partial class SellViewModel : ObservableObject
                 || p.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
                 || p.Sku.Contains(search, StringComparison.OrdinalIgnoreCase))
             {
-                FilteredProducts.Add(p);
+                FilteredProducts.Add(_tilesByProductId[p.ProductId]);
             }
         }
     }
@@ -434,10 +470,13 @@ public partial class SellViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(ProductSearchText)) return;
 
         var search = ProductSearchText.Trim();
+        // The last fallback is "whatever the search box left visible", which is what
+        // ApplyProductFilter keeps, spelled out rather than read back off the displayed list.
         var match = Products.FirstOrDefault(p => string.Equals(p.Sku, search, StringComparison.OrdinalIgnoreCase))
-                    ?? FilteredProducts.FirstOrDefault(p => string.Equals(p.Sku, search, StringComparison.OrdinalIgnoreCase))
                     ?? Products.FirstOrDefault(p => string.Equals(p.Name, search, StringComparison.OrdinalIgnoreCase))
-                    ?? FilteredProducts.FirstOrDefault();
+                    ?? Products.FirstOrDefault(p =>
+                            p.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                            || p.Sku.Contains(search, StringComparison.OrdinalIgnoreCase));
 
         if (match is not null)
         {

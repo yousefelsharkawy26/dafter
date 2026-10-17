@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
+             xmlns:components="using:Daftar.Views.Components"
              xmlns:views="using:Daftar.Views"
              x:Class="Daftar.Views.SettingsView"
              x:DataType="vm:SettingsViewModel"
@@ -8,9 +9,9 @@
 
     <Grid RowDefinitions="Auto,Auto,*" Margin="16">
 
-        <!-- ========================================================
-             1. Header: Title & Status
-             ======================================================== -->
+        
+
+
         <Border Grid.Row="0" Classes="panel" Margin="0,0,0,12" Padding="16,12">
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Grid.Column="0" Spacing="2">
@@ -25,9 +26,9 @@
             </Grid>
         </Border>
 
-        <!-- ========================================================
-             2. Section Tabs Navigation Bar
-             ======================================================== -->
+        
+
+
         <Border Grid.Row="1" Classes="panel" Margin="0,0,0,14" Padding="8,6">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button Classes="tab-btn" Classes.accent="{Binding IsCompanySectionActive}"
@@ -72,15 +73,15 @@
             </StackPanel>
         </Border>
 
-        <!-- ========================================================
-             3. Active Section Content Host
-             ======================================================== -->
+        
+
+
         <Panel Grid.Row="2">
 
-            <!-- ── SECTION 0: Company & Invoice Settings ────────────── -->
+            
             <ScrollViewer IsVisible="{Binding IsCompanySectionActive}">
                 <StackPanel Spacing="16" MinWidth="700" HorizontalAlignment="Left">
-                    <!-- Company Info Card -->
+                    
                     <Border Classes="panel" Padding="20">
                         <StackPanel Spacing="14">
                             <TextBlock Classes="heading" Text="بيانات الشركة والمؤسسة" />
@@ -115,7 +116,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Receipt Customization Card -->
+                    
                     <Border Classes="panel" Padding="20">
                         <StackPanel Spacing="14">
                             <TextBlock Classes="heading" Text="إعدادات الفاتورة والإيصالات" />
@@ -130,7 +131,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Save Action -->
+                    
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{Binding StatusMessage}"
                                    Classes="caption muted" VerticalAlignment="Center" />
@@ -145,10 +146,10 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- ── SECTION 1: Users Management ───────────────────────── -->
+            
             <Border Classes="panel" Padding="16" IsVisible="{Binding IsUsersSectionActive}">
                 <DockPanel LastChildFill="True">
-                    <!-- Top Action Bar -->
+                    
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock Text="قائمة المستخدمين والحسابات" Classes="heading" />
@@ -163,7 +164,7 @@
                         </Button>
                     </Grid>
 
-                    <!-- Users DataGrid -->
+                    
                     <DataGrid ItemsSource="{Binding UsersList}"
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
@@ -207,10 +208,10 @@
                 </DockPanel>
             </Border>
 
-            <!-- ── SECTION 2: Roles & Permissions ────────────────────── -->
+            
             <Border Classes="panel" Padding="16" IsVisible="{Binding IsRolesSectionActive}">
                 <DockPanel LastChildFill="True">
-                    <!-- Top Action Bar -->
+                    
                     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock Text="الأدوار والصلاحيات (Security Roles)" Classes="heading" />
@@ -225,7 +226,7 @@
                         </Button>
                     </Grid>
 
-                    <!-- Roles DataGrid -->
+                    
                     <DataGrid ItemsSource="{Binding RolesList}"
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
@@ -253,7 +254,7 @@
                 </DockPanel>
             </Border>
 
-            <!-- ── SECTION 3: Backup & Safety ────────────────────────── -->
+            
             <ScrollViewer IsVisible="{Binding IsBackupSectionActive}">
                 <StackPanel Spacing="16" MaxWidth="760" HorizontalAlignment="Left">
                     <Border Classes="panel" Padding="20">
@@ -326,259 +327,147 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- ── SECTION 4: Error Log ────────────────────────────────
-                 The real view, hosted rather than copied, so it keeps its
-                 own layout and its own load-on-open.
+            
 
-                 The visibility sits on the wrapper because the child
-                 declares its own x:DataType, which is what its inherited
-                 bindings would then be compiled against. -->
+
+
+
+
+
             <Panel IsVisible="{Binding IsErrorsSectionActive}">
                 <views:ErrorsView DataContext="{Binding Errors}" />
             </Panel>
 
         </Panel>
 
-        <!-- ========================================================
-             4. Floating Modal Dialog: User (إضافة / تعديل مستخدم)
-             ======================================================== -->
-        <Grid Grid.Row="0" Grid.RowSpan="3"
-              IsVisible="{Binding IsUserDialogOpen}"
-              ZIndex="1000">
+        
 
-            <!-- Backdrop -->
-            <Button Command="{Binding CloseUserDialogCommand}"
-                    Background="#77000000"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Padding="0"
-                    BorderThickness="0"
-                    CornerRadius="0" />
 
-            <!-- Centered Modal Card -->
-            <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
-                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="10"
-                    Width="520"
-                    Margin="20"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    BoxShadow="0 14 40 0 #66000000">
-                <Grid RowDefinitions="Auto,*,Auto">
-                    <!-- Dialog Header -->
-                    <Border Grid.Row="0"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="0,0,0,1"
-                            CornerRadius="10,10,0,0"
-                            Padding="20,14">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Grid.Column="0" Spacing="2">
-                                <TextBlock Text="{Binding UserDialogTitle}" Classes="subtitle" FontWeight="Bold" />
-                                <TextBlock Text="أدخل بيانات المستخدم وصلاحيات الدخول ثم اضغط حفظ" Classes="caption muted" />
-                            </StackPanel>
-                            <Button Grid.Column="1" Classes="ghost" Command="{Binding CloseUserDialogCommand}"
-                                    Width="34" Height="34" FontSize="15" FontWeight="Bold" ToolTip.Tip="إغلاق">
-                                <TextBlock Text="✕" />
-                            </Button>
-                        </Grid>
-                    </Border>
+        <components:ModalDialog IsVisible="{Binding IsUserDialogOpen}"
+                             Title="{Binding UserDialogTitle}"
+                             Subtitle="أدخل بيانات المستخدم وصلاحيات الدخول ثم اضغط حفظ"
+                             CloseCommand="{Binding CloseUserDialogCommand}"
+                             BackdropCloses="True"
+                             DialogWidth="520"
+                             ZIndex="1000">
 
-                    <!-- Dialog Body -->
-                    <ScrollViewer Grid.Row="1" Padding="20,16" MaxHeight="460">
-                        <StackPanel Spacing="14">
-                            <!-- Username -->
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="اسم المستخدم (لتسجيل الدخول) *" Classes="caption muted" />
-                                <TextBox Text="{Binding UserFormUsername, Mode=TwoWay}"
-                                         PlaceholderText="مثال: ahmed أو cashier1"
-                                         Height="38" VerticalContentAlignment="Center" />
-                            </StackPanel>
+            <components:ModalDialog.Body>
+                <StackPanel Spacing="14">
+                    
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="اسم المستخدم (لتسجيل الدخول) *" Classes="caption muted" />
+                        <TextBox Text="{Binding UserFormUsername, Mode=TwoWay}"
+                                 PlaceholderText="مثال: ahmed أو cashier1"
+                                 Height="38" VerticalContentAlignment="Center" />
+                    </StackPanel>
 
-                            <!-- Full Name -->
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="الاسم الكامل للمستخدم *" Classes="caption muted" />
-                                <TextBox Text="{Binding UserFormFullName, Mode=TwoWay}"
-                                         PlaceholderText="مثال: أحمد محمد علي"
-                                         Height="38" VerticalContentAlignment="Center" />
-                            </StackPanel>
+                    
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="الاسم الكامل للمستخدم *" Classes="caption muted" />
+                        <TextBox Text="{Binding UserFormFullName, Mode=TwoWay}"
+                                 PlaceholderText="مثال: أحمد محمد علي"
+                                 Height="38" VerticalContentAlignment="Center" />
+                    </StackPanel>
 
-                            <!-- Role ComboBox -->
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="الدور الوظيفي *" Classes="caption muted" />
-                                <ComboBox ItemsSource="{Binding RoleOptions}"
-                                          SelectedItem="{Binding UserFormSelectedRole, Mode=TwoWay}"
-                                          HorizontalAlignment="Stretch" Height="38">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:RoleOption">
-                                            <TextBlock Text="{Binding Name}" />
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                            </StackPanel>
+                    
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="الدور الوظيفي *" Classes="caption muted" />
+                        <ComboBox ItemsSource="{Binding RoleOptions}"
+                                  SelectedItem="{Binding UserFormSelectedRole, Mode=TwoWay}"
+                                  HorizontalAlignment="Stretch" Height="38">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RoleOption">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
 
-                            <!-- Password -->
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="كلمة المرور" Classes="caption muted" />
-                                <TextBox Text="{Binding UserFormPassword, Mode=TwoWay}"
-                                         PasswordChar="●"
-                                         PlaceholderText="أدخل كلمة المرور (أو اتركها فارغة للإبقاء على الحالية)"
-                                         Height="38" VerticalContentAlignment="Center" />
-                            </StackPanel>
+                    
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="كلمة المرور" Classes="caption muted" />
+                        <TextBox Text="{Binding UserFormPassword, Mode=TwoWay}"
+                                 PasswordChar="●"
+                                 PlaceholderText="أدخل كلمة المرور (أو اتركها فارغة للإبقاء على الحالية)"
+                                 Height="38" VerticalContentAlignment="Center" />
+                    </StackPanel>
 
-                            <!-- Checkboxes -->
-                            <StackPanel Spacing="8" Margin="0,4,0,0">
-                                <CheckBox IsChecked="{Binding UserFormIsActive, Mode=TwoWay}" Content="حساب نشط ومفعل" />
-                                <CheckBox IsChecked="{Binding UserFormMustChangePassword, Mode=TwoWay}" Content="إلزام المستخدم بتغيير كلمة المرور عند أول تسجيل دخول" />
-                            </StackPanel>
+                    
+                    <StackPanel Spacing="8" Margin="0,4,0,0">
+                        <CheckBox IsChecked="{Binding UserFormIsActive, Mode=TwoWay}" Content="حساب نشط ومفعل" />
+                        <CheckBox IsChecked="{Binding UserFormMustChangePassword, Mode=TwoWay}" Content="إلزام المستخدم بتغيير كلمة المرور عند أول تسجيل دخول" />
+                    </StackPanel>
 
-                            <!-- Error message -->
-                            <TextBlock Text="{Binding UserDialogError}" Classes="caption danger"
-                                       IsVisible="{Binding UserDialogError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    
+                    <TextBlock Text="{Binding UserDialogError}" Classes="caption danger"
+                               IsVisible="{Binding UserDialogError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+            </components:ModalDialog.Body>
+
+            <components:ModalDialog.Footer>
+                <components:DialogActions IsBusy="{Binding IsBusy}" CancelCommand="{Binding CloseUserDialogCommand}" SaveCommand="{Binding SaveUserCommand}" SaveText="حفظ المستخدم" />
+            </components:ModalDialog.Footer>
+        </components:ModalDialog>
+
+        
+
+
+        <components:ModalDialog IsVisible="{Binding IsRoleDialogOpen}"
+                             Title="{Binding RoleDialogTitle}"
+                             Subtitle="حدد مسمى الدور، أقصى نسبة خصم، والصلاحيات الممنوحة"
+                             CloseCommand="{Binding CloseRoleDialogCommand}"
+                             BackdropCloses="True"
+                             DialogWidth="620"
+                             ZIndex="1000">
+
+            <components:ModalDialog.Body>
+                <StackPanel Spacing="14">
+                    
+                    <Grid ColumnDefinitions="*,180" ColumnSpacing="12">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="اسم الدور الوظيفي *" Classes="caption muted" />
+                            <TextBox Text="{Binding RoleFormName, Mode=TwoWay}"
+                                     PlaceholderText="مثال: كاشير، أمين مستودع، مشرف مبيعات"
+                                     Height="38" VerticalContentAlignment="Center" />
                         </StackPanel>
-                    </ScrollViewer>
-
-                    <!-- Dialog Footer -->
-                    <Border Grid.Row="2"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="0,1,0,0"
-                            CornerRadius="0,0,10,10"
-                            Padding="16,12">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                            <ProgressBar Grid.Column="0" IsIndeterminate="True"
-                                         IsVisible="{Binding IsBusy}" VerticalAlignment="Center" Height="4" />
-                            <Button Grid.Column="1" Classes="ghost" Content="إلغاء"
-                                    Command="{Binding CloseUserDialogCommand}" Height="36" Padding="16,6" />
-                            <Button Grid.Column="2" Classes="accent" Command="{Binding SaveUserCommand}"
-                                    Height="36" Padding="20,6">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <TextBlock Text="✓" FontWeight="Bold" />
-                                    <TextBlock Text="حفظ المستخدم" FontWeight="Bold" />
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </Border>
-        </Grid>
-
-        <!-- ========================================================
-             5. Floating Modal Dialog: Role (إضافة / تعديل دور وصلاحيات)
-             ======================================================== -->
-        <Grid Grid.Row="0" Grid.RowSpan="3"
-              IsVisible="{Binding IsRoleDialogOpen}"
-              ZIndex="1000">
-
-            <!-- Backdrop -->
-            <Button Command="{Binding CloseRoleDialogCommand}"
-                    Background="#77000000"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Padding="0"
-                    BorderThickness="0"
-                    CornerRadius="0" />
-
-            <!-- Centered Modal Card -->
-            <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
-                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="10"
-                    Width="620"
-                    Margin="20"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    BoxShadow="0 14 40 0 #66000000">
-                <Grid RowDefinitions="Auto,*,Auto">
-                    <!-- Dialog Header -->
-                    <Border Grid.Row="0"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="0,0,0,1"
-                            CornerRadius="10,10,0,0"
-                            Padding="20,14">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Grid.Column="0" Spacing="2">
-                                <TextBlock Text="{Binding RoleDialogTitle}" Classes="subtitle" FontWeight="Bold" />
-                                <TextBlock Text="حدد مسمى الدور، أقصى نسبة خصم، والصلاحيات الممنوحة" Classes="caption muted" />
-                            </StackPanel>
-                            <Button Grid.Column="1" Classes="ghost" Command="{Binding CloseRoleDialogCommand}"
-                                    Width="34" Height="34" FontSize="15" FontWeight="Bold" ToolTip.Tip="إغلاق">
-                                <TextBlock Text="✕" />
-                            </Button>
-                        </Grid>
-                    </Border>
-
-                    <!-- Dialog Body -->
-                    <ScrollViewer Grid.Row="1" Padding="20,16" MaxHeight="480">
-                        <StackPanel Spacing="14">
-                            <!-- Role Name & Max Discount -->
-                            <Grid ColumnDefinitions="*,180" ColumnSpacing="12">
-                                <StackPanel Grid.Column="0" Spacing="4">
-                                    <TextBlock Text="اسم الدور الوظيفي *" Classes="caption muted" />
-                                    <TextBox Text="{Binding RoleFormName, Mode=TwoWay}"
-                                             PlaceholderText="مثال: كاشير، أمين مستودع، مشرف مبيعات"
-                                             Height="38" VerticalContentAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="4">
-                                    <TextBlock Text="أقصى نسبة خصم مسموحة (%)" Classes="caption muted" />
-                                    <TextBox Text="{Binding RoleFormMaxDiscount, Mode=TwoWay}"
-                                             PlaceholderText="0 إلى 100"
-                                             Height="38" VerticalContentAlignment="Center" />
-                                </StackPanel>
-                            </Grid>
-
-                            <Rectangle Height="1" Fill="{DynamicResource ControlStrokeColorDefaultBrush}" Margin="0,4" />
-
-                            <!-- Permissions Checklist -->
-                            <TextBlock Text="الصلاحيات المتاحة لهذا الدور:" Classes="strong" />
-
-                            <ItemsControl ItemsSource="{Binding RolePermissions}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:PermissionCheckItem">
-                                        <Border Classes="surface" Margin="0,0,0,8" Padding="12,8">
-                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" HorizontalAlignment="Stretch">
-                                                <StackPanel Spacing="2" Margin="8,0,0,0">
-                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                                                    <TextBlock Text="{Binding Description}" Classes="caption muted" />
-                                                </StackPanel>
-                                            </CheckBox>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-
-                            <!-- Error message -->
-                            <TextBlock Text="{Binding RoleDialogError}" Classes="caption danger"
-                                       IsVisible="{Binding RoleDialogError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="أقصى نسبة خصم مسموحة (%)" Classes="caption muted" />
+                            <TextBox Text="{Binding RoleFormMaxDiscount, Mode=TwoWay}"
+                                     PlaceholderText="0 إلى 100"
+                                     Height="38" VerticalContentAlignment="Center" />
                         </StackPanel>
-                    </ScrollViewer>
+                    </Grid>
 
-                    <!-- Dialog Footer -->
-                    <Border Grid.Row="2"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="0,1,0,0"
-                            CornerRadius="0,0,10,10"
-                            Padding="16,12">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                            <ProgressBar Grid.Column="0" IsIndeterminate="True"
-                                         IsVisible="{Binding IsBusy}" VerticalAlignment="Center" Height="4" />
-                            <Button Grid.Column="1" Classes="ghost" Content="إلغاء"
-                                    Command="{Binding CloseRoleDialogCommand}" Height="36" Padding="16,6" />
-                            <Button Grid.Column="2" Classes="accent" Command="{Binding SaveRoleCommand}"
-                                    Height="36" Padding="20,6">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <TextBlock Text="✓" FontWeight="Bold" />
-                                    <TextBlock Text="حفظ الدور والصلاحيات" FontWeight="Bold" />
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </Border>
-        </Grid>
+                    <Rectangle Height="1" Fill="{DynamicResource ControlStrokeColorDefaultBrush}" Margin="0,4" />
+
+                    
+                    <TextBlock Text="الصلاحيات المتاحة لهذا الدور:" Classes="strong" />
+
+                    <ItemsControl ItemsSource="{Binding RolePermissions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PermissionCheckItem">
+                                <Border Classes="surface" Margin="0,0,0,8" Padding="12,8">
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" HorizontalAlignment="Stretch">
+                                        <StackPanel Spacing="2" Margin="8,0,0,0">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Description}" Classes="caption muted" />
+                                        </StackPanel>
+                                    </CheckBox>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    
+                    <TextBlock Text="{Binding RoleDialogError}" Classes="caption danger"
+                               IsVisible="{Binding RoleDialogError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+            </components:ModalDialog.Body>
+
+            <components:ModalDialog.Footer>
+                <components:DialogActions IsBusy="{Binding IsBusy}" CancelCommand="{Binding CloseRoleDialogCommand}" SaveCommand="{Binding SaveRoleCommand}" SaveText="حفظ الدور والصلاحيات" />
+            </components:ModalDialog.Footer>
+        </components:ModalDialog>
 
     </Grid>
 </UserControl>

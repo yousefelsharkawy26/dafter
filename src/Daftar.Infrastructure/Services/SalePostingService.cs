@@ -45,7 +45,9 @@ public sealed class SalePostingService(DaftarContext context)
     }
 
     /// <summary>
-    /// Refuses the sale when the customer's resulting balance exceeds their credit limit.
+    /// Refuses the sale when the customer may not take the credit it leaves them owing: an account
+    /// the business has stopped trading with, one that is still pending approval, or a balance past
+    /// the credit limit.
     ///
     /// <para>
     /// <see cref="Daftar.Domain.Parties.Party.CreditLimit"/> has been stored, edited behind its
@@ -66,6 +68,14 @@ public sealed class SalePostingService(DaftarContext context)
     /// The two paths that create an invoice do; the return path reduces the balance and so cannot
     /// breach a limit from below.
     /// </para>
+    ///
+    /// <para>
+    /// Only the credit is gated, so a sale that leaves nothing owing is allowed to every account the
+    /// business is still willing to trade with. <see cref="Daftar.Domain.Parties.PartyStatus"/>
+    /// documents <c>Pending</c> as "cash only until the manager approves", and it is how every
+    /// customer a distributor creates in the field starts: refusing those outright turned the settle
+    /// wizard's own new customers into ones it could never invoice.
+    /// </para>
     /// </summary>
     public async Task EnsureCreditAllowsAsync(int saleId, CancellationToken cancellationToken = default)
     {
@@ -75,7 +85,9 @@ public sealed class SalePostingService(DaftarContext context)
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new DomainException($"Sale {saleId} does not exist.");
 
-        if (sale.Status != Domain.Parties.PartyStatus.Active)
+        // A blocked or archived account is not a credit question: the business is not trading with
+        // it, and a balance of zero does not make it sellable.
+        if (sale.Status is Domain.Parties.PartyStatus.Blocked or Domain.Parties.PartyStatus.Archived)
             throw new DomainException(
                 $"حساب '{sale.Name}' مش نشط، مش ينفع تتباعله فاتورة.");
 
@@ -86,9 +98,17 @@ public sealed class SalePostingService(DaftarContext context)
             .Select(t => (decimal?)t.Amount)
             .SumAsync(cancellationToken) ?? 0m);
 
-        // Only what they owe us is credit. A negative balance is money they are owed, which no
-        // limit should cap.
-        if (balance > 0m && balance > sale.CreditLimit)
+        // Only what they owe us is credit, and a negative balance is money they are owed, which no
+        // limit should cap. Nothing owing means nothing was sold on credit, so no status can refuse
+        // it -- see the Pending note above.
+        if (balance <= 0m)
+            return;
+
+        if (sale.Status == Domain.Parties.PartyStatus.Pending)
+            throw new DomainException(
+                $"حساب '{sale.Name}' لسه مستني موافقة المدير — ينفع يشتري نقدي بس.");
+
+        if (balance > sale.CreditLimit)
             throw new DomainException(
                 $"رصيد '{sale.Name}' بعد الفاتورة {balance:N2} ج.م، وهو أكبر من حد الائتمان "
                 + $"{sale.CreditLimit:N2} ج.م. عدّل الحد أو حطّم نقدي.");

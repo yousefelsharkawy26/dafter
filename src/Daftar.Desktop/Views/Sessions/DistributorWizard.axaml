@@ -1,0 +1,690 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Daftar.ViewModels"
+             xmlns:components="using:Daftar.Views.Components"
+             x:Class="Daftar.Views.Sessions.DistributorWizard"
+             x:DataType="vm:SessionsViewModel"
+             FlowDirection="RightToLeft">
+
+    <!--
+        Settling a distributor round: five steps in one dialog.
+
+        The step used to be written into the title, and only on the open half, so the count restarted
+        halfway through and the header reflowed on every step. The title is now fixed — the stepper
+        under it carries the position — which is also what keeps the frame still.
+
+        Colour comes from the theme's semantic brushes rather than hexes written here. Three of the
+        old pairs put the accent blue on a tinted panel, which is under the contrast floor, and a
+        panel is the one place a hard-coded blue cannot know what it is sitting on.
+    -->
+
+    <UserControl.Styles>
+        <!-- Stepper dots. Pending is the base look; done and current are layered over it, so a step
+             never needs its own colour spelled out. -->
+        <Style Selector="Border.stepDot">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="CornerRadius" Value="13" />
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.stepDot.done">
+            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        </Style>
+        <!--
+            The current step is the one the user is on, so it is ringed, not filled. Filled like the
+            finished ones, the two were told apart only by the label, which is a difference you have
+            to go looking for. Pending is the base hairline on white.
+        -->
+        <Style Selector="Border.stepDot.active">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="2.5" />
+        </Style>
+        <!--
+            A stretched TextBlock starts its text at the leading edge and the top, which in this
+            right-to-left layout parked the digit against the top right of the disc instead of the
+            middle. The alignment settles it in the centre whatever the flow direction.
+        -->
+        <Style Selector="Border.stepDot > TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.stepDot.done > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+        </Style>
+        <Style Selector="Border.stepDot.active > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+        <Style Selector="TextBlock.stepName">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
+        <Style Selector="TextBlock.stepName.current">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+
+        <!--
+            A result row is an action, not a choice made in a list: the customer who was chosen is
+            shown once, in the accent bar underneath. Left to itself the list also painted a
+            selection of its own, and a click that missed the button — the row was taller than the
+            button it held — lit the row up as though it had been taken while changing nothing.
+            Measured in that state the row's ink sat at about 2.9:1 on the highlight, so the false
+            signal was the faintest thing on the screen as well as the wrong one.
+
+            The row now fills its item, so the part that lights up is the part that acts, and there
+            is no selection left to be mistaken for the choice.
+        -->
+        <Style Selector="ListBox#CustomerResults ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        </Style>
+        <!--
+            The item's own chrome holds its content two pixels off every edge, and a press inside
+            that hairline reached the item and never the button: the row was already the thing that
+            looked taken, so the strip that swallowed the press was invisible. Measured, the row was
+            41 pixels tall around a 37-pixel button. Taking the inset out of the way leaves the
+            whole row as the action, and the hairline as nothing.
+        -->
+        <Style Selector="ListBox#CustomerResults ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Margin" Value="0" />
+        </Style>
+        <!--
+            The list's selection is not the choice — the accent bar underneath is. Left visible it
+            painted the row it had selected in accent with the dark ink meant for white, and a click
+            that missed the button lit that up as if the customer had been taken. Without a colour of
+            its own the highlight can no longer say something the wizard does not mean.
+        -->
+        <Style Selector="ListBox#CustomerResults ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+    </UserControl.Styles>
+
+    <components:ModalDialog IsVisible="{Binding IsWizardVisible}"
+                             Title="{Binding WizardTitle}"
+                             Subtitle="{Binding WizardSubtitle}"
+                             CloseCommand="{Binding WizardCancelCommand}"
+                             PrimaryHeader="True"
+                             DialogWidth="940"
+                             BodyMaxHeight="520"
+                             ZIndex="1000">
+
+        <components:ModalDialog.Body>
+            <!-- MinHeight matches a full body minus the padding, so every step is the same height and
+                 the card does not move when the wizard moves. -->
+            <Grid RowDefinitions="Auto,*" RowSpacing="12" MinHeight="488">
+
+                <!-- Where the wizard is, per step rather than in the title. -->
+                <Border Grid.Row="0" Classes="surface" Padding="12,8">
+                    <Grid ColumnDefinitions="*,*,*,*,*">
+                        <StackPanel Grid.Column="0">
+                            <Border Classes="stepDot"
+                                    Classes.done="{Binding WizardStepDone1}"
+                                    Classes.active="{Binding IsWizard_OpenDist}">
+                                <TextBlock Text="1" />
+                            </Border>
+                            <TextBlock Classes="stepName" Classes.current="{Binding IsWizard_OpenDist}"
+                                       Text="اختر الموزع" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <Border Classes="stepDot"
+                                    Classes.done="{Binding WizardStepDone2}"
+                                    Classes.active="{Binding IsWizard_OpenLoad}">
+                                <TextBlock Text="2" />
+                            </Border>
+                            <TextBlock Classes="stepName" Classes.current="{Binding IsWizard_OpenLoad}"
+                                       Text="حمّل السيارة" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <Border Classes="stepDot"
+                                    Classes.done="{Binding WizardStepDone3}"
+                                    Classes.active="{Binding IsWizard_SettleCust}">
+                                <TextBlock Text="3" />
+                            </Border>
+                            <TextBlock Classes="stepName" Classes.current="{Binding IsWizard_SettleCust}"
+                                       Text="اختر العميل" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="3">
+                            <Border Classes="stepDot"
+                                    Classes.done="{Binding WizardStepDone4}"
+                                    Classes.active="{Binding IsWizard_SettleProd}">
+                                <TextBlock Text="4" />
+                            </Border>
+                            <TextBlock Classes="stepName" Classes.current="{Binding IsWizard_SettleProd}"
+                                       Text="الفاتورة" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <Border Classes="stepDot"
+                                    Classes.active="{Binding IsWizard_SettleFinish}">
+                                <TextBlock Text="5" />
+                            </Border>
+                            <TextBlock Classes="stepName" Classes.current="{Binding IsWizard_SettleFinish}"
+                                       Text="التسوية" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Panel Grid.Row="1">
+
+                    <!-- STEP 1: Open_Distributor — choose distributor -->
+                    <StackPanel IsVisible="{Binding IsWizard_OpenDist}"
+                                Spacing="12" MaxWidth="560"
+                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Classes="subtitle" Text="اختر الموزع الذي ستبدأ له الجولة" />
+                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                   Text="تظهر في القائمة الموزعون النشطون الذين لا يملكون جولة مفتوحة." />
+                        <ComboBox ItemsSource="{Binding AvailableDistributorsForNewSession}"
+                                  SelectedItem="{Binding SelectedDistributorForNewSession}"
+                                  IsVisible="{Binding HasAvailableDistributors}"
+                                  HorizontalAlignment="Stretch" Height="44" FontSize="15">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DistributorLookupItem">
+                                    <TextBlock Text="{Binding DisplayText}" FontSize="14" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Border Classes="panel" Padding="14" IsVisible="{Binding !HasAvailableDistributors}">
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="strong" Text="لا يوجد موزع متاح" />
+                                <TextBlock Classes="muted" TextWrapping="Wrap"
+                                           Text="كل الموزعين النشطين لديهم جولة مفتوحة بالفعل. اقفل جولة أحدهم من زر «تسوية» في قائمة الجولات، ثم افتح هذه النافذة من جديد." />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- STEP 2: Open_LoadVehicle — product buttons from warehouse -->
+                    <Grid IsVisible="{Binding IsWizard_OpenLoad}" RowDefinitions="Auto,*" RowSpacing="12">
+                        <Grid Grid.Row="0" ColumnDefinitions="Auto,220,*" ColumnSpacing="12" VerticalAlignment="Center">
+                            <TextBlock Classes="strong" Text="من مستودع" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding WizardWarehouseOptions}"
+                                      SelectedItem="{Binding WizardSelectedWarehouse}"
+                                      HorizontalAlignment="Stretch" Height="36">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:WarehouseLocationOption">
+                                        <TextBlock Text="{Binding Name}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Grid.Column="2" Classes="muted" FontSize="12" TextWrapping="Wrap"
+                                       VerticalAlignment="Center"
+                                       Text="اضغط ＋ لإضافة وحدة إلى السيارة، و− لتقليل الكمية." />
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding WizardProducts}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:WizardProductButton">
+                                        <Border Width="165" MinHeight="130" Margin="5"
+                                                Background="{Binding TileBackground}"
+                                                BorderBrush="{Binding TileBorderBrush}"
+                                                BorderThickness="2" CornerRadius="4">
+                                            <Grid RowDefinitions="*,Auto,Auto,Auto" Margin="8,6">
+                                                <TextBlock Grid.Row="0" Text="{Binding ProductName}"
+                                                           TextWrapping="Wrap" TextAlignment="Center"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Classes="strong" FontSize="13" />
+                                                <ComboBox Grid.Row="1"
+                                                          ItemsSource="{Binding AvailableUnits}"
+                                                          SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
+                                                          DisplayMemberBinding="{Binding UnitName}"
+                                                          IsVisible="{Binding HasMultipleUnits}"
+                                                          HorizontalAlignment="Center"
+                                                          MinHeight="24" Height="24" FontSize="11"
+                                                          Padding="6,1" Margin="0,2" />
+                                                <TextBlock Grid.Row="2" Text="{Binding AvailableText}"
+                                                           Classes="muted" FontSize="11"
+                                                           HorizontalAlignment="Center" Margin="0,2" />
+                                                <Grid Grid.Row="3" ColumnDefinitions="32,*,32" Margin="2,4,2,0">
+                                                    <Button Grid.Column="0" Content="−" Classes="ghost"
+                                                            Command="{Binding $parent[UserControl].((vm:SessionsViewModel)DataContext).WizardRemoveProductCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            IsVisible="{Binding IsSelected}"
+                                                            Width="32" Height="28" Padding="0"
+                                                            FontSize="16" FontWeight="Bold" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding QtyText}"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                               Classes="strong" FontSize="14" />
+                                                    <Button Grid.Column="2" Content="＋" Classes="primary"
+                                                            Command="{Binding $parent[UserControl].((vm:SessionsViewModel)DataContext).WizardAddProductCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            Width="32" Height="28" Padding="0" FontSize="14" />
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- STEP 3: Settle_Customer — search + create customer, invoices so far -->
+                    <Grid IsVisible="{Binding IsWizard_SettleCust}" RowDefinitions="Auto,*,Auto" RowSpacing="10">
+
+                        <!-- The picker spans the width: side by side with the grid it squeezed the grid
+                             down to a third of a 940-pixel dialog and truncated every column. -->
+                        <StackPanel Grid.Row="0" Spacing="8">
+                            <TextBlock Classes="strong" Text="ابحث عن العميل أو أنشئ عميلاً جديداً" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBox Text="{Binding WizardCustomerSearch}"
+                                         PlaceholderText="اكتب اسم العميل للبحث..." Height="38" FontSize="14" />
+                                <Button Grid.Column="1" Classes="ghost" Content="＋ جديد"
+                                        Command="{Binding WizardShowNewCustomerCommand}"
+                                        Height="38" Padding="14,0" />
+                            </Grid>
+
+                            <ListBox Name="CustomerResults"
+                                     ItemsSource="{Binding WizardCustomerResults}"
+                                     MaxHeight="130"
+                                     IsVisible="{Binding HasCustomerResults}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:CustomerLookupItem">
+                                        <Button Classes="ghost" Content="{Binding DisplayText}"
+                                                Command="{Binding $parent[UserControl].((vm:SessionsViewModel)DataContext).WizardSelectCustomerCommand}"
+                                                CommandParameter="{Binding}"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Right"
+                                                Padding="10,6" FontSize="13" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <!-- The chosen customer, and the way out of that choice: the round settles one
+                                 invoice at a time, so the pick is kept between invoices and dropped here
+                                 when the next one goes to someone else. -->
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"
+                                  IsVisible="{Binding WizardSelectedCustomer, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <Border Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                        CornerRadius="{DynamicResource ControlCornerRadius}" Padding="12,7">
+                                    <TextBlock Text="{Binding WizardSelectedCustomer.DisplayText}"
+                                               Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
+                                               FontWeight="Bold" VerticalAlignment="Center" />
+                                </Border>
+                                <Button Grid.Column="1" Classes="ghost" Content="تبديل العميل"
+                                        Command="{Binding WizardClearCustomerCommand}"
+                                        Height="34" Padding="12,0" FontSize="12" />
+                            </Grid>
+
+                            <Border IsVisible="{Binding WizardIsNewCustomerVisible}"
+                                    Classes="panel" Padding="12">
+                                <ScrollViewer MaxHeight="240">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Classes="strong" Text="بيانات العميل الجديد" FontSize="13" />
+                                        <TextBox Text="{Binding WizardNewCustomerName}"    PlaceholderText="اسم العميل *" Height="34" />
+                                        <TextBox Text="{Binding WizardNewCustomerPhone}"   PlaceholderText="رقم الهاتف"    Height="34" />
+                                        <TextBox Text="{Binding WizardNewCustomerAddress}" PlaceholderText="العنوان"       Height="34" />
+                                        <TextBlock Classes="danger" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                   Text="{Binding WizardNewCustomerError}"
+                                                   IsVisible="{Binding WizardNewCustomerError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="primary" Content="✔ إنشاء وتحديد"
+                                                    Command="{Binding WizardCreateCustomerCommand}"
+                                                    Height="32" Padding="14,0" FontSize="13" />
+                                            <Button Classes="ghost" Content="إلغاء"
+                                                    Command="{Binding WizardHideNewCustomerCommand}"
+                                                    Height="32" Padding="14,0" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
+
+                        <Border Grid.Row="1" Classes="panel" Padding="10">
+                            <Grid RowDefinitions="Auto,*" RowSpacing="6">
+                                <TextBlock Grid.Row="0" Classes="strong" FontSize="13"
+                                           Text="فواتير هذه الجولة" />
+                                <DataGrid Grid.Row="1" ItemsSource="{Binding WizardSessionSales}"
+                                          AutoGenerateColumns="False" IsReadOnly="True"
+                                          CanUserResizeColumns="False">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="السند"   Binding="{Binding DocNo}"         Width="110" />
+                                        <DataGridTextColumn Header="العميل"  Binding="{Binding CustomerName}"  Width="*" MinWidth="160" />
+                                        <DataGridTextColumn Header="النوع"   Binding="{Binding KindText}"      Width="120" />
+                                        <DataGridTextColumn Header="القيمة"  Binding="{Binding TotalText}"     Width="120" />
+                                        <DataGridTextColumn Header="المدفوع" Binding="{Binding PaidCashText}"  Width="120" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+
+                        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <components:KpiTile Grid.Column="0" Label="عدد الفواتير"
+                                                Value="{Binding WizardInvoiceCount}" />
+                            <components:KpiTile Grid.Column="1" Label="إجمالي المبيعات"
+                                                Value="{Binding WizardTotalSalesText}" />
+                        </Grid>
+                    </Grid>
+
+                    <!-- STEP 4: Settle_Products — product tiles from vehicle, then payment -->
+                    <Grid IsVisible="{Binding IsWizard_SettleProd}" RowDefinitions="Auto,*,Auto" RowSpacing="10">
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                <TextBlock Classes="strong" Text="الأصناف على السيارة" FontSize="13" VerticalAlignment="Center" />
+                                <Border Classes="surface" Padding="10,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center"
+                                                   Text="رصيد العميل السابق" />
+                                        <TextBlock Classes="strong" FontSize="12" VerticalAlignment="Center"
+                                                   Text="{Binding WizardCustomerPreviousBalanceText}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <TextBlock Classes="muted" FontSize="13" VerticalAlignment="Center"
+                                           Text="إجمالي الفاتورة" />
+                                <TextBlock Classes="strong" FontSize="18" VerticalAlignment="Center"
+                                           Text="{Binding WizardCartTotalText}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                            <Panel>
+                                <ItemsControl ItemsSource="{Binding WizardProducts}"
+                                              IsVisible="{Binding WizardHasVehicleProducts}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:WizardProductButton">
+                                            <Border Width="165" MinHeight="145" Margin="5"
+                                                    Background="{Binding TileBackground}"
+                                                    BorderBrush="{Binding TileBorderBrush}"
+                                                    BorderThickness="2" CornerRadius="4">
+                                                <Grid RowDefinitions="*,Auto,Auto,Auto,Auto" Margin="8,6">
+                                                    <TextBlock Grid.Row="0" Text="{Binding ProductName}"
+                                                               TextWrapping="Wrap" TextAlignment="Center"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                               Classes="strong" FontSize="13" />
+                                                    <ComboBox Grid.Row="1"
+                                                              ItemsSource="{Binding AvailableUnits}"
+                                                              SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
+                                                              DisplayMemberBinding="{Binding UnitName}"
+                                                              IsVisible="{Binding HasMultipleUnits}"
+                                                              HorizontalAlignment="Center"
+                                                              MinHeight="24" Height="24" FontSize="11"
+                                                              Padding="6,1" Margin="0,2" />
+                                                    <TextBlock Grid.Row="2" Text="{Binding PriceText}"
+                                                               Classes="strong" FontSize="12"
+                                                               HorizontalAlignment="Center" />
+                                                    <TextBlock Grid.Row="3" Text="{Binding LineTotalText}"
+                                                               Classes="success" FontSize="12" FontWeight="Bold"
+                                                               HorizontalAlignment="Center"
+                                                               IsVisible="{Binding IsSelected}" />
+                                                    <Grid Grid.Row="4" ColumnDefinitions="32,*,32" Margin="2,4,2,0">
+                                                        <Button Grid.Column="0" Content="−" Classes="ghost"
+                                                                Command="{Binding $parent[UserControl].((vm:SessionsViewModel)DataContext).WizardRemoveProductCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                IsVisible="{Binding IsSelected}"
+                                                                Width="32" Height="28" Padding="0"
+                                                                FontSize="16" FontWeight="Bold" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding QtyText}"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                   Classes="strong" FontSize="14" />
+                                                        <Button Grid.Column="2" Content="＋" Classes="primary"
+                                                                Command="{Binding $parent[UserControl].((vm:SessionsViewModel)DataContext).WizardAddProductCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                Width="32" Height="28" Padding="0" FontSize="14" />
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- The van came back empty. Saying so beats an empty grid and a zero total
+                                     the user has to interpret. -->
+                                <Border Classes="panel" Padding="16" VerticalAlignment="Top"
+                                        IsVisible="{Binding !WizardHasVehicleProducts}">
+                                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                        <TextBlock Classes="strong" Text="لا توجد بضاعة على السيارة"
+                                                   HorizontalAlignment="Center" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" TextAlignment="Center"
+                                                   Text="لم يُحمَّل أي صنف على السيارة في هذه الجولة. ارجع إلى الخطوة الثانية وحمّل السيارة، أو سجّل تحصيل مديونية فقط." />
+                                    </StackPanel>
+                                </Border>
+                            </Panel>
+                        </ScrollViewer>
+
+                        <!-- Payment and debt collection for the customer -->
+                        <Border Grid.Row="2" Classes="panel" Padding="14">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                    <TextBlock Classes="strong" FontSize="14" VerticalAlignment="Center"
+                                               Text="الدفع والتحصيل للعميل" />
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                                        <Button Content="نقدي" Classes="ghost"
+                                                Command="{Binding SetWizardPaymentCashCommand}"
+                                                Background="{Binding WizardCashBtnBackground}"
+                                                Foreground="{Binding WizardCashBtnForeground}"
+                                                BorderBrush="{DynamicResource AccentFillColorDefaultBrush}"
+                                                BorderThickness="1"
+                                                Height="32" Padding="14,0" FontWeight="SemiBold" />
+                                        <Button Content="آجل" Classes="ghost"
+                                                Command="{Binding SetWizardPaymentCreditCommand}"
+                                                Background="{Binding WizardCreditBtnBackground}"
+                                                Foreground="{Binding WizardCreditBtnForeground}"
+                                                BorderBrush="{DynamicResource SystemFillColorCriticalBrush}"
+                                                BorderThickness="1"
+                                                Height="32" Padding="14,0" FontWeight="SemiBold" />
+                                        <Button Content="جزئي" Classes="ghost"
+                                                Command="{Binding SetWizardPaymentPartialCommand}"
+                                                Background="{Binding WizardPartialBtnBackground}"
+                                                Foreground="{Binding WizardPartialBtnForeground}"
+                                                BorderBrush="{DynamicResource SystemFillColorSuccessBrush}"
+                                                BorderThickness="1"
+                                                Height="32" Padding="14,0" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*,*,1.3*" ColumnSpacing="12">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Classes="strong" FontSize="12"
+                                                   Text="المدفوع نقداً من الفاتورة" />
+                                        <TextBox Text="{Binding WizardPaidAmountText}" Height="34" FontSize="14" />
+                                        <TextBlock Classes="danger" FontSize="11" FontWeight="SemiBold"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding WizardRemainingCreditNotice}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Classes="strong" FontSize="12"
+                                                   Text="تحصيل مديونية سابقة (إن وُجد)" />
+                                        <TextBox Text="{Binding WizardDebtCollectionText}" Height="34" FontSize="14" />
+                                        <TextBlock Classes="muted" FontSize="11" Text="يُخصم من حساب العميل القديم" />
+                                    </StackPanel>
+
+                                    <Border Grid.Column="2" Classes="surface" Padding="10">
+                                        <StackPanel Spacing="6" VerticalAlignment="Center">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Classes="strong" FontSize="12"
+                                                           Text="إجمالي المقبوض نقداً للموزع" />
+                                                <TextBlock Grid.Column="1" Classes="strong" FontSize="14"
+                                                           Text="{Binding WizardTotalCashFromCustomerText}" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Classes="muted" FontSize="11"
+                                                           Text="رصيد العميل بعد المعاملة" />
+                                                <TextBlock Grid.Column="1" Classes="strong" FontSize="12"
+                                                           Text="{Binding WizardProjectedBalanceText}" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- STEP 5: Settle_Finish — summary + cash count + close -->
+                    <ScrollViewer IsVisible="{Binding IsWizard_SettleFinish}">
+                        <StackPanel Spacing="12">
+                            <TextBlock Classes="subtitle" Text="ملخص الجولة قبل الإغلاق والتسوية" />
+
+                            <!-- Only the figures that carry a judgement are coloured: money not collected,
+                                 money recovered, and the figure the physical count is checked against. -->
+                            <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="8">
+                                <components:KpiTile Grid.Column="0" Label="إجمالي المبيعات"
+                                                    Value="{Binding WizardTotalSalesText}" />
+                                <components:KpiTile Grid.Column="1" Label="كاش المبيعات"
+                                                    Value="{Binding WizardCashSalesText}" />
+                                <components:KpiTile Grid.Column="2" Label="مبيعات آجلة"
+                                                    Value="{Binding WizardCreditSalesText}"
+                                                    ValueBrush="{DynamicResource SystemFillColorCriticalBrush}" />
+                                <components:KpiTile Grid.Column="3" Label="تحصيل ديون قديمة"
+                                                    Value="{Binding WizardDebtCollectionsText}"
+                                                    ValueBrush="{DynamicResource SystemFillColorSuccessBrush}" />
+                                <components:KpiTile Grid.Column="4" Label="الكاش المتوقع بالعهدة"
+                                                    Value="{Binding WizardExpectedCashText}"
+                                                    ValueBrush="{DynamicResource SystemFillColorSuccessBrush}" />
+                            </Grid>
+
+                            <Border Classes="panel" Padding="10">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="strong" FontSize="13"
+                                               Text="الفواتير والمعاملات المسجلة في الجولة" />
+                                    <DataGrid ItemsSource="{Binding WizardSessionSales}"
+                                              AutoGenerateColumns="False" IsReadOnly="True"
+                                              MaxHeight="150" CanUserResizeColumns="False">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="السند"   Binding="{Binding DocNo}"        Width="120" />
+                                            <DataGridTextColumn Header="العميل"  Binding="{Binding CustomerName}" Width="*" MinWidth="160" />
+                                            <DataGridTextColumn Header="النوع"   Binding="{Binding KindText}"     Width="120" />
+                                            <DataGridTextColumn Header="القيمة"  Binding="{Binding TotalText}"    Width="110" />
+                                            <DataGridTextColumn Header="المدفوع" Binding="{Binding PaidCashText}" Width="110" />
+                                            <DataGridTextColumn Header="التاريخ" Binding="{Binding Date}"         Width="120" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="panel" Padding="12">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="strong" FontSize="13" VerticalAlignment="Center"
+                                                   Text="جرد السيارة والبضاعة المتبقية" />
+                                        <TextBlock Grid.Column="1" Classes="muted" FontSize="11"
+                                                   VerticalAlignment="Center"
+                                                   Text="تعود تلقائياً إلى المخزن عند التأكيد" />
+                                    </Grid>
+                                    <ItemsControl ItemsSource="{Binding WizardUnsoldStockItems}"
+                                                  IsVisible="{Binding HasUnsoldStock}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SessionUnsoldStockItem">
+                                                <Border Classes="surface" Padding="10,6" Margin="4">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Classes="strong" FontSize="13"
+                                                                   Text="{Binding ProductName}" />
+                                                        <TextBlock Classes="muted" Text=":" />
+                                                        <TextBlock Classes="strong" FontSize="13"
+                                                                   Text="{Binding QuantityText}" />
+                                                        <TextBlock Classes="muted" FontSize="11"
+                                                                   Text="(متبقي بالسيارة)" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Classes="muted" FontSize="12"
+                                               Text="لا توجد بضاعة متبقية بالسيارة."
+                                               IsVisible="{Binding !HasUnsoldStock}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="panel" Padding="14">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <TextBlock Classes="strong" FontSize="14"
+                                                   Text="الكاش الفعلي المعدود المستلم من الموزع" />
+                                        <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                                                   Text="المبلغ الفعلي الذي تم تسليمه لإغلاق العهدة وحساب العمولة." />
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{Binding WizardCountedCash}"
+                                             PlaceholderText="0.00"
+                                             FontSize="22" Height="48"
+                                             Width="220" HorizontalContentAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                </Panel>
+            </Grid>
+        </components:ModalDialog.Body>
+
+        <components:ModalDialog.Footer>
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto">
+
+                <!-- One back button for the whole wizard, not three copies of it. -->
+                <Button Grid.Column="0" Classes="ghost" Content="◀ رجوع"
+                        Command="{Binding WizardBackCommand}"
+                        IsVisible="{Binding IsWizard_CanGoBack}"
+                        Height="40" Padding="16,0" />
+
+                <TextBlock Grid.Column="2" Classes="danger" Text="{Binding WizardError}"
+                           FontWeight="Bold" FontSize="13"
+                           VerticalAlignment="Center" Margin="12,0"
+                           IsVisible="{Binding WizardError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <Button Grid.Column="3" Classes="ghost" Content="إنهاء الجولة"
+                        Command="{Binding WizardGoToFinishCommand}"
+                        IsVisible="{Binding IsWizard_CanFinish}"
+                        Height="40" Padding="16,0" Margin="0,0,8,0" />
+
+                <!-- Primary action, one per step -->
+                <Button Grid.Column="4" Classes="primary" Content="التالي ▶"
+                        Command="{Binding WizardNext_OpenToLoadCommand}"
+                        IsVisible="{Binding IsWizard_OpenDist}"
+                        Height="40" Padding="22,0" FontSize="14" />
+
+                <Button Grid.Column="4" Classes="primary" Content="✔ تحميل السيارة"
+                        Command="{Binding WizardConfirmLoadVehicleCommand}"
+                        IsVisible="{Binding IsWizard_OpenLoad}"
+                        Height="40" Padding="22,0" FontSize="14" />
+
+                <Button Grid.Column="4" Classes="primary" Content="التالي ▶"
+                        Command="{Binding WizardNext_SettleToProductsCommand}"
+                        IsVisible="{Binding IsWizard_SettleCust}"
+                        Height="40" Padding="22,0" FontSize="14" />
+
+                <Button Grid.Column="4" Classes="primary" Content="{Binding WizardRegisterButtonText}"
+                        Command="{Binding WizardRegisterInvoiceCommand}"
+                        IsVisible="{Binding IsWizard_SettleProd}"
+                        Height="40" Padding="22,0" FontSize="14" />
+
+                <!-- Closing the round is the one irreversible action here, so it is the app's danger
+                     button rather than the accent one: red used to mean both «this is unpaid» and
+                     «this is final». -->
+                <Button Grid.Column="4" Classes="danger" Content="✔ تأكيد الإغلاق"
+                        Command="{Binding WizardConfirmSettlementCommand}"
+                        IsVisible="{Binding IsWizard_SettleFinish}"
+                        Height="40" Padding="22,0" FontSize="14" />
+
+                <Button Grid.Column="5" Classes="ghost" Content="إلغاء"
+                        Command="{Binding WizardCancelCommand}"
+                        Height="40" Padding="14,0" Margin="8,0,0,0" />
+            </Grid>
+        </components:ModalDialog.Footer>
+    </components:ModalDialog>
+</UserControl>

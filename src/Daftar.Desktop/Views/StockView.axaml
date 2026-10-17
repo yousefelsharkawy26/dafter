@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
+             xmlns:components="using:Daftar.Views.Components"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
@@ -10,12 +11,12 @@
 
     <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{StaticResource PagePadding}">
 
-        <!-- ========================================================
-             1. Header: Stock Overview & Smart KPI Cards
-             ======================================================== -->
+        
+
+
         <Border Grid.Row="0" Classes="panel" Margin="0,0,0,12" Padding="16,12">
             <StackPanel Spacing="12">
-                <!-- Top Row: Title & Action Launchers -->
+                
                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                     <StackPanel Grid.Column="0" Spacing="2">
                         <TextBlock Text="إدارة وتتبع حركة المخزون" Classes="subtitle" FontWeight="Bold" />
@@ -29,7 +30,7 @@
                         </StackPanel>
                     </Button>
 
-                    <!-- Parked, not deleted. See StockViewModel.StockTransferEnabled. -->
+                    
                     <Button Grid.Column="2" x:Name="TransferButton" Classes="accent"
                             Command="{Binding ToggleTransferPanelCommand}"
                             IsVisible="{Binding IsStockTransferEnabled}"
@@ -43,73 +44,51 @@
 
                 <Rectangle Height="1" Fill="{DynamicResource ControlStrokeColorDefaultBrush}" />
 
-                <!-- 4 Smart Inventory KPI Cards -->
+                
                 <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
-                    <!-- 1. Total Stock Value -->
-                    <Border Grid.Column="0" Classes="surface" Padding="14,10">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="إجمالي قيمة المخزون 💰" Classes="caption muted" />
-                            <TextBlock Text="{Binding TotalStockValueText}"
-                                       Classes="subtitle" FontWeight="Bold"
-                                       Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
-                        </StackPanel>
-                    </Border>
+                    
+                    <components:KpiTile Grid.Column="0" Label="إجمالي قيمة المخزون 💰" Value="{Binding TotalStockValueText}" ValueBrush="{DynamicResource AccentFillColorDefaultBrush}" />
 
-                    <!-- 2. Products & Lots Count -->
+                    
                     <Border Grid.Column="1" Classes="surface" Padding="14,10">
                         <StackPanel Spacing="4">
                             <TextBlock Text="عدد الأصناف المتاحة 📦" Classes="caption muted" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="{Binding TotalProductsCount, StringFormat='{}{0} منتج'}"
-                                           Classes="subtitle" FontWeight="Bold" />
+                                <!-- Same size as the tile's figure next to it: this card is
+                                     hand-written, so it does not inherit the tile's size, and a
+                                     figure that is a step smaller than its neighbour reads as a
+                                     lesser number. -->
+                                <TextBlock Text="{Binding TotalProductsCount, Converter={StaticResource ArabicCount}, ConverterParameter='منتج|منتجان|منتجات'}"
+                                           FontSize="{DynamicResource FontSizeTitle}" FontWeight="Bold" />
                                 <TextBlock Text="|" Classes="caption muted" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding TotalLotsCount, StringFormat='{}{0} لوت'}"
+                                <TextBlock Text="{Binding TotalLotsCount, Converter={StaticResource ArabicCount}, ConverterParameter='لوت|لوتان|لوتات'}"
                                            Classes="caption muted" VerticalAlignment="Center" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
 
-                    <!-- 3. Low Stock Alert (Click to filter) -->
+                    
                     <Button Grid.Column="2" Classes="ghost"
                             Command="{Binding ToggleLowStockFilterCommand}"
                             Padding="0" BorderThickness="0" CornerRadius="4"
                             HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                             ToolTip.Tip="انقر للتصفية السريعة للأصناف تحت حد الطلب">
-                        <Border Classes="surface" Padding="14,10">
-                            <StackPanel Spacing="4">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Text="تنبيه النواقص ⚠️" Classes="caption muted" />
-                                    <Border Grid.Column="1" Classes="badge danger" IsVisible="{Binding HasLowStock}">
-                                        <TextBlock Text="نواقص" FontSize="10" />
-                                    </Border>
-                                </Grid>
-                                <TextBlock Text="{Binding LowStockCount, StringFormat='{}{0} صنف تحت الحد'}"
-                                           Classes="subtitle" FontWeight="Bold"
-                                           Foreground="#D13438" />
-                            </StackPanel>
-                        </Border>
+                        <components:KpiTile Label="تنبيه النواقص ⚠️" Value="{Binding LowStockCount, Converter={StaticResource ArabicCount}, ConverterParameter='صنف تحت الحد|صنفان تحت الحد|أصناف تحت الحد'}" ValueBrush="#D13438" />
                     </Button>
 
-                    <!-- 4. Stock in Distributor Vans -->
-                    <Border Grid.Column="3" Classes="surface" Padding="14,10">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="بضاعة سيارات التوزيع 🚚" Classes="caption muted" />
-                            <TextBlock Text="{Binding VansStockValueText}"
-                                       Classes="subtitle" FontWeight="Bold"
-                                       Foreground="#0078D4" />
-                        </StackPanel>
-                    </Border>
+                    
+                    <components:KpiTile Grid.Column="3" Label="بضاعة سيارات التوزيع 🚚" Value="{Binding VansStockValueText}" ValueBrush="#0078D4" />
                 </Grid>
             </StackPanel>
         </Border>
 
-        <!-- ========================================================
-             2. Navigation Tabs & Smart Filter Bar
-             ======================================================== -->
+        
+
+
         <Border Grid.Row="1" Classes="panel" Margin="0,0,0,10" Padding="14,10">
             <StackPanel Spacing="10">
                 <Grid ColumnDefinitions="Auto,*,Auto">
-                    <!-- Tab Switcher: Balances vs Tracking -->
+                    
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
                         <Button Classes="tab-btn"
                                 Classes.accent="{Binding IsBalancesTabActive}"
@@ -132,25 +111,19 @@
                         </Button>
                     </StackPanel>
 
-                    <!-- Status note -->
+                    
                     <TextBlock Grid.Column="2" Text="{Binding StatusMessage}"
                                Classes="caption muted" VerticalAlignment="Center" />
                 </Grid>
 
                 <Rectangle Height="1" Fill="{DynamicResource ControlStrokeColorDefaultBrush}" />
 
-                <!-- Filters for Balances Tab -->
+                
                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" IsVisible="{Binding IsBalancesTabActive}">
-                    <!-- Search Input -->
-                    <TextBox Grid.Column="0" Text="{Binding SearchText, Mode=TwoWay}"
-                             PlaceholderText="ابحث باسم المنتج، الكود (SKU)، أو موقع التخزين..."
-                             Height="38" VerticalContentAlignment="Center">
-                        <TextBox.InnerLeftContent>
-                            <PathIcon Data="{StaticResource IconSearch}" Width="15" Height="15" Margin="10,0" Opacity="0.6" />
-                        </TextBox.InnerLeftContent>
-                    </TextBox>
+                    
+                    <components:SearchBox Grid.Column="0" Text="{Binding SearchText, Mode=TwoWay}" Placeholder="ابحث باسم المنتج، الكود (SKU)، أو موقع التخزين..." />
 
-                    <!-- Location Filter Pills -->
+                    
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                         <TextBlock Text="الموقع:" Classes="caption muted" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <Button Classes="tab-btn" Classes.accent="{Binding IsLocationFilterAll}"
@@ -164,7 +137,7 @@
                                 Content="سيارات التوزيع" Padding="10,6" />
                     </StackPanel>
 
-                    <!-- Stock Status Pills -->
+                    
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                         <TextBlock Text="الحالة:" Classes="caption muted" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <Button Classes="tab-btn" Classes.accent="{Binding IsStatusFilterAll}"
@@ -176,18 +149,12 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Filters for Tracking Tab -->
+                
                 <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12" IsVisible="{Binding IsTrackingTabActive}">
-                    <!-- Search Input -->
-                    <TextBox Grid.Column="0" Text="{Binding TrackingSearchText, Mode=TwoWay}"
-                             PlaceholderText="ابحث بالصنف، الكود، رقم الفاتورة، إذن التحويل، أو البيان..."
-                             Height="38" VerticalContentAlignment="Center">
-                        <TextBox.InnerLeftContent>
-                            <PathIcon Data="{StaticResource IconSearch}" Width="15" Height="15" Margin="10,0" Opacity="0.6" />
-                        </TextBox.InnerLeftContent>
-                    </TextBox>
+                    
+                    <components:SearchBox Grid.Column="0" Text="{Binding TrackingSearchText, Mode=TwoWay}" Placeholder="ابحث بالصنف، الكود، رقم الفاتورة، إذن التحويل، أو البيان..." />
 
-                    <!-- Movement Kind Filter Pills -->
+                    
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                         <TextBlock Text="النوع:" Classes="caption muted" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <Button Classes="tab-btn" Classes.accent="{Binding IsTrackingKindAll}"
@@ -207,7 +174,7 @@
                                 Content="⚖️ تسويات" Padding="8,6" />
                     </StackPanel>
 
-                    <!-- Location Filter Pills -->
+                    
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                         <TextBlock Text="الموقع:" Classes="caption muted" VerticalAlignment="Center" Margin="0,0,4,0" />
                         <Button Classes="tab-btn" Classes.accent="{Binding IsTrackingLocationAll}"
@@ -221,19 +188,19 @@
                                 Content="سيارات" Padding="8,6" />
                     </StackPanel>
 
-                    <!-- Reset Filters Button -->
+                    
                     <Button Grid.Column="3" Classes="ghost" Command="{Binding ResetTrackingFiltersCommand}"
                             Content="إعادة ضبط" Height="36" Padding="10,0" ToolTip.Tip="إلغاء التصفية وإظهار الكل" />
                 </Grid>
             </StackPanel>
         </Border>
 
-        <!-- ========================================================
-             3. Main Content: Balances Grid vs Tracking Ledger Grid
-             ======================================================== -->
+        
+
+
         <Panel Grid.Row="2">
 
-            <!-- TAB 1: Stock Balances Table -->
+            
             <Border Classes="panel" IsVisible="{Binding IsBalancesTabActive}">
                 <Grid RowDefinitions="*">
                     <DataGrid ItemsSource="{Binding FilteredRows}"
@@ -242,7 +209,7 @@
                               GridLinesVisibility="Horizontal"
                               RowHeight="52">
                         <DataGrid.Columns>
-                            <!-- Product Name & Code -->
+                            
                             <DataGridTemplateColumn Header="الصنف والكود" Width="2.5*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:StockRow">
@@ -254,7 +221,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Storage Location -->
+                            
                             <DataGridTemplateColumn Header="موقع التخزين" Width="1.5*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:StockRow">
@@ -265,7 +232,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Quantity & Unit -->
+                            
                             <DataGridTemplateColumn Header="الرصيد المتاح" Width="1.2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:StockRow">
@@ -274,7 +241,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Unit Cost -->
+                            
                             <DataGridTemplateColumn Header="سعر التكلفة" Width="1*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:StockRow">
@@ -283,7 +250,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Total Value -->
+                            
                             <DataGridTemplateColumn Header="القيمة الإجمالية" Width="1.3*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:StockRow">
@@ -293,7 +260,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Stock Status Badge -->
+                            
                             <DataGridTemplateColumn Header="حالة المخزون" Width="1*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:StockRow">
@@ -308,7 +275,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Supplier / Received Date -->
+                            
                             <DataGridTemplateColumn Header="تاريخ الاستلام" Width="1.1*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:StockRow">
@@ -317,12 +284,12 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Smart Quick Actions -->
+                            
                             <DataGridTemplateColumn Header="إجراءات" Width="160">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:StockRow">
                                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="6,0">
-                                            <!-- Track Movements Button -->
+                                            
                                             <Button Classes="ghost" Padding="8,4"
                                                     Command="{Binding $parent[UserControl].((vm:StockViewModel)DataContext).TrackProductMovementsCommand}"
                                                     CommandParameter="{Binding}"
@@ -333,7 +300,7 @@
                                                 </StackPanel>
                                             </Button>
 
-                                            <!-- Direct Transfer Button. Parked with the rest. -->
+                                            
                                             <Button Classes="ghost" Padding="8,4"
                                                     Command="{Binding $parent[UserControl].((vm:StockViewModel)DataContext).OpenTransferForStockCommand}"
                                                     CommandParameter="{Binding}"
@@ -351,7 +318,7 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <!-- Empty state -->
+                    
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                                 Spacing="8" IsVisible="{Binding !FilteredRows.Count}">
                         <TextBlock Text="📦" FontSize="36" HorizontalAlignment="Center" Opacity="0.4" />
@@ -361,7 +328,7 @@
                 </Grid>
             </Border>
 
-            <!-- TAB 2: Stock Movement Tracking Ledger -->
+            
             <Border Classes="panel" IsVisible="{Binding IsTrackingTabActive}">
                 <Grid RowDefinitions="*">
                     <DataGrid ItemsSource="{Binding FilteredMovements}"
@@ -370,7 +337,7 @@
                               GridLinesVisibility="Horizontal"
                               RowHeight="52">
                         <DataGrid.Columns>
-                            <!-- Date & Time -->
+                            
                             <DataGridTemplateColumn Header="التاريخ والوقت" Width="140">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:MovementRow">
@@ -380,7 +347,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Product Name & Sku -->
+                            
                             <DataGridTemplateColumn Header="الصنف" Width="2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:MovementRow">
@@ -392,7 +359,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Movement Kind Badge -->
+                            
                             <DataGridTemplateColumn Header="نوع الحركة" Width="150">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:MovementRow">
@@ -408,7 +375,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Movement Quantity -->
+                            
                             <DataGridTemplateColumn Header="الكمية المحركة" Width="130">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:MovementRow">
@@ -420,7 +387,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Storage Location -->
+                            
                             <DataGridTemplateColumn Header="الموقع" Width="1.2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:MovementRow">
@@ -431,7 +398,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Document / Reference Number -->
+                            
                             <DataGridTemplateColumn Header="رقم المستند / المرجع" Width="150">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:MovementRow">
@@ -442,7 +409,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <!-- Notes / Reason -->
+                            
                             <DataGridTemplateColumn Header="البيان / الملاحظات" Width="2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate x:DataType="vm:MovementRow">
@@ -456,7 +423,7 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <!-- Empty state -->
+                    
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                                 Spacing="8" IsVisible="{Binding !FilteredMovements.Count}">
                         <TextBlock Text="📜" FontSize="36" HorizontalAlignment="Center" Opacity="0.4" />
@@ -467,9 +434,9 @@
             </Border>
         </Panel>
 
-        <!-- ========================================================
-             4. Footer: Summary Totals
-             ======================================================== -->
+        
+
+
         <Border Grid.Row="3" Classes="panel" Margin="0,10,0,0" Padding="14,10">
             <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="20">
                 <TextBlock Grid.Column="0"
@@ -493,181 +460,125 @@
             </Grid>
         </Border>
 
-        <!-- ========================================================
-             5. Floating Modal Dialog: Stock Transfer (تحويل مخزون)
-             ======================================================== -->
-        <Grid Grid.Row="0" Grid.RowSpan="4"
-              IsVisible="{Binding IsTransferPanelOpen}"
-              ZIndex="1000">
+        
 
-            <!-- Backdrop: dims background and closes on click -->
-            <Button Command="{Binding CloseTransferPanelCommand}"
-                    Background="#77000000"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Padding="0"
-                    BorderThickness="0"
-                    CornerRadius="0" />
 
-            <!-- Centered Modal Card -->
-            <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
-                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Width="750"
-                    Margin="24"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    BoxShadow="0 14 40 0 #66000000"
-                    Padding="0">
-                <Grid RowDefinitions="Auto,*,Auto">
+        <components:ModalDialog IsVisible="{Binding IsTransferPanelOpen}"
+                             Title="🔄 تحويل مخزون بين المواقع"
+                             Subtitle="نقل بضاعة من المستودع إلى سيارة موزع، أو العكس، أو بين المستودعات"
+                             CloseCommand="{Binding CloseTransferPanelCommand}"
+                             BackdropCloses="True"
+                             DialogWidth="750"
+                             ZIndex="1000">
 
-                    <!-- Dialog Header -->
-                    <Border Grid.Row="0"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="0,0,0,1"
-                            CornerRadius="8,8,0,0"
-                            Padding="20,14">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Grid.Column="0" Spacing="2">
-                                <TextBlock Text="🔄 تحويل مخزون بين المواقع"
-                                           Classes="subtitle" FontWeight="Bold" />
-                                <TextBlock Text="نقل بضاعة من المستودع إلى سيارة موزع، أو العكس، أو بين المستودعات"
-                                           Classes="caption muted" />
-                            </StackPanel>
+            <components:ModalDialog.Body>
+                <StackPanel Spacing="16">
 
-                            <!-- Close Button (✕) -->
-                            <Button Grid.Column="1"
-                                    Classes="ghost"
-                                    Command="{Binding CloseTransferPanelCommand}"
-                                    Width="36" Height="36"
-                                    HorizontalContentAlignment="Center"
-                                    VerticalContentAlignment="Center"
-                                    FontSize="16" FontWeight="Bold"
-                                    ToolTip.Tip="إغلاق">
-                                <TextBlock Text="✕" />
-                            </Button>
-                        </Grid>
-                    </Border>
-
-                    <!-- Dialog Body -->
-                    <ScrollViewer Grid.Row="1" Padding="20,18" VerticalScrollBarVisibility="Auto">
-                        <StackPanel Spacing="16">
-
-                            <!-- Row 1: Source & Destination Locations -->
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-                                <!-- Source Location -->
-                                <StackPanel Grid.Column="0" Spacing="4">
-                                    <TextBlock Text="من موقع (المصدر) *" Classes="caption muted" />
-                                    <ComboBox ItemsSource="{Binding Locations}"
-                                              SelectedItem="{Binding SelectedSourceLocation, Mode=TwoWay}"
-                                              HorizontalAlignment="Stretch" Height="38">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:TransferLocationItem">
-                                                <TextBlock Text="{Binding DisplayText}" />
-                                            </DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                </StackPanel>
-
-                                <!-- Destination Location -->
-                                <StackPanel Grid.Column="1" Spacing="4">
-                                    <TextBlock Text="إلى موقع (الوجهة) *" Classes="caption muted" />
-                                    <ComboBox ItemsSource="{Binding Locations}"
-                                              SelectedItem="{Binding SelectedDestinationLocation, Mode=TwoWay}"
-                                              HorizontalAlignment="Stretch" Height="38">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:TransferLocationItem">
-                                                <TextBlock Text="{Binding DisplayText}" />
-                                            </DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Row 2: Lot / Product Selection -->
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="الصنف المتاح للتحويل في موقع المصدر *" Classes="caption muted" />
-                                <ComboBox ItemsSource="{Binding SourceLots}"
-                                          SelectedItem="{Binding SelectedSourceLot, Mode=TwoWay}"
-                                          HorizontalAlignment="Stretch" Height="40"
-                                          PlaceholderText="اختر صنفاً متوفراً من موقع المصدر...">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:TransferLotItem">
-                                            <TextBlock Text="{Binding DisplayText}" />
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                            </StackPanel>
-
-                            <!-- Row 3: Quantity with Quick Fill -->
-                            <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="12" VerticalAlignment="Center">
-                                <StackPanel Grid.Column="0" Spacing="4">
-                                    <TextBlock Text="الكمية المراد تحويلها *" Classes="caption muted" />
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                                        <TextBox Grid.Column="0" Text="{Binding TransferQuantity, Mode=TwoWay}"
-                                                 FontSize="16" FontWeight="Bold" Height="40"
-                                                 VerticalContentAlignment="Center" />
-                                        <Button Grid.Column="1" Classes="ghost" Content="الكل"
-                                                Command="{Binding SetMaxTransferQuantityCommand}"
-                                                Height="40" Padding="12,0"
-                                                ToolTip.Tip="تحويل كامل الرصيد المتاح" />
-                                    </Grid>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="1" Grid.ColumnSpan="2" Spacing="4">
-                                    <TextBlock Text="ملاحظات التحويل (اختياري)" Classes="caption muted" />
-                                    <TextBox Text="{Binding TransferNotes, Mode=TwoWay}"
-                                             PlaceholderText="مثال: تحميل بضاعة للمندوب لبدء خط السير..."
-                                             Height="40" VerticalContentAlignment="Center" />
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Alerts / Error / Success Feedback -->
-                            <Border Classes="badge danger" Padding="12,8"
-                                    IsVisible="{Binding TransferError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                <TextBlock Text="{Binding TransferError}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                            </Border>
-
-                            <Border Classes="badge success" Padding="12,8"
-                                    IsVisible="{Binding TransferSuccess, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                <TextBlock Text="{Binding TransferSuccess}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                            </Border>
+                    
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                        
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="من موقع (المصدر) *" Classes="caption muted" />
+                            <ComboBox ItemsSource="{Binding Locations}"
+                                      SelectedItem="{Binding SelectedSourceLocation, Mode=TwoWay}"
+                                      HorizontalAlignment="Stretch" Height="38">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TransferLocationItem">
+                                        <TextBlock Text="{Binding DisplayText}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                         </StackPanel>
-                    </ScrollViewer>
 
-                    <!-- Dialog Footer -->
-                    <Border Grid.Row="2"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="0,1,0,0"
-                            CornerRadius="0,0,8,8"
-                            Padding="20,12">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                            <TextBlock Grid.Column="0"
-                                       Text="سيتم إنشاء وترحيل إذن تحويل مخزني وتحديث الأرصدة فوراً"
-                                       Classes="caption muted" VerticalAlignment="Center" />
+                        
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="إلى موقع (الوجهة) *" Classes="caption muted" />
+                            <ComboBox ItemsSource="{Binding Locations}"
+                                      SelectedItem="{Binding SelectedDestinationLocation, Mode=TwoWay}"
+                                      HorizontalAlignment="Stretch" Height="38">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TransferLocationItem">
+                                        <TextBlock Text="{Binding DisplayText}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
 
-                            <Button Grid.Column="1" Classes="ghost"
-                                    Content="إلغاء"
-                                    Command="{Binding CloseTransferPanelCommand}"
-                                    Padding="18,8" />
+                    
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="الصنف المتاح للتحويل في موقع المصدر *" Classes="caption muted" />
+                        <ComboBox ItemsSource="{Binding SourceLots}"
+                                  SelectedItem="{Binding SelectedSourceLot, Mode=TwoWay}"
+                                  HorizontalAlignment="Stretch" Height="40"
+                                  PlaceholderText="اختر صنفاً متوفراً من موقع المصدر...">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:TransferLotItem">
+                                    <TextBlock Text="{Binding DisplayText}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
 
-                            <Button Grid.Column="2" Classes="accent"
-                                    Command="{Binding ExecuteTransferCommand}"
-                                    IsEnabled="{Binding !IsTransferring}"
-                                    Padding="24,8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="✓" FontSize="14" FontWeight="Bold" />
-                                    <TextBlock Text="تأكيد وترحيل التحويل" FontWeight="Bold" />
-                                </StackPanel>
-                            </Button>
-                        </Grid>
+                    
+                    <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="12" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="الكمية المراد تحويلها *" Classes="caption muted" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                <TextBox Grid.Column="0" Text="{Binding TransferQuantity, Mode=TwoWay}"
+                                         FontSize="16" FontWeight="Bold" Height="40"
+                                         VerticalContentAlignment="Center" />
+                                <Button Grid.Column="1" Classes="ghost" Content="الكل"
+                                        Command="{Binding SetMaxTransferQuantityCommand}"
+                                        Height="40" Padding="12,0"
+                                        ToolTip.Tip="تحويل كامل الرصيد المتاح" />
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Grid.ColumnSpan="2" Spacing="4">
+                            <TextBlock Text="ملاحظات التحويل (اختياري)" Classes="caption muted" />
+                            <TextBox Text="{Binding TransferNotes, Mode=TwoWay}"
+                                     PlaceholderText="مثال: تحميل بضاعة للمندوب لبدء خط السير..."
+                                     Height="40" VerticalContentAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+
+                    
+                    <Border Classes="badge danger" Padding="12,8"
+                            IsVisible="{Binding TransferError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding TransferError}" FontWeight="SemiBold" TextWrapping="Wrap" />
                     </Border>
+
+                    <Border Classes="badge success" Padding="12,8"
+                            IsVisible="{Binding TransferSuccess, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding TransferSuccess}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
+            </components:ModalDialog.Body>
+
+            <components:ModalDialog.Footer>
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                    <TextBlock Grid.Column="0"
+                               Text="سيتم إنشاء وترحيل إذن تحويل مخزني وتحديث الأرصدة فوراً"
+                               Classes="caption muted" VerticalAlignment="Center" />
+
+                    <Button Grid.Column="1" Classes="ghost"
+                            Content="إلغاء"
+                            Command="{Binding CloseTransferPanelCommand}"
+                            Padding="18,8" />
+
+                    <Button Grid.Column="2" Classes="accent"
+                            Command="{Binding ExecuteTransferCommand}"
+                            IsEnabled="{Binding !IsTransferring}"
+                            Padding="24,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="✓" FontSize="14" FontWeight="Bold" />
+                            <TextBlock Text="تأكيد وترحيل التحويل" FontWeight="Bold" />
+                        </StackPanel>
+                    </Button>
                 </Grid>
-            </Border>
-        </Grid>
+            </components:ModalDialog.Footer>
+        </components:ModalDialog>
 
     </Grid>
 </UserControl>

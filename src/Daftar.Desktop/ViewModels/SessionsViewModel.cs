@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -277,19 +278,80 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
     public bool IsWizard_SettleCust   => WizardStep == WizardStep.Settle_Customer;
     public bool IsWizard_SettleProd   => WizardStep == WizardStep.Settle_Products;
     public bool IsWizard_SettleFinish => WizardStep == WizardStep.Settle_Finish;
+    /// <summary>«إنهاء الجولة» jumps straight to the settle step; it belongs to the two steps that come
+    /// before it, not to the finish step itself, where it would sit beside the primary and say the same
+    /// thing twice.</summary>
     public bool IsWizard_CanFinish    => WizardStep == WizardStep.Settle_Customer
-                                      || WizardStep == WizardStep.Settle_Products
-                                      || WizardStep == WizardStep.Settle_Finish;
+                                      || WizardStep == WizardStep.Settle_Products;
 
+    /// <summary>Stable dialog title: it does not change between steps, so the frame never jumps.</summary>
+    /// <remarks>
+    /// The step used to be baked into this string, which left the settle half unnumbered and reflowed
+    /// the header on every step. The moving part is <see cref="WizardSubtitle"/> and the stepper.
+    /// </remarks>
     public string WizardTitle => WizardStep switch
     {
-        WizardStep.Open_Distributor => "بدء جولة جديدة — اختر الموزع (1/2)",
-        WizardStep.Open_LoadVehicle => "بدء جولة — اختر المنتجات للتحميل (2/2)",
-        WizardStep.Settle_Customer  => $"تسوية جولة {_wizardDistributorName} — اختر العميل",
-        WizardStep.Settle_Products  => $"منتجات {_wizardCurrentCustomerName}",
-        WizardStep.Settle_Finish    => $"إنهاء جولة {_wizardDistributorName}",
+        WizardStep.None => string.Empty,
+        WizardStep.Open_Distributor or WizardStep.Open_LoadVehicle => "بدء جولة موزع",
+        _ => "جولة الموزع",
+    };
+
+    /// <summary>Whose round this is; empty on the open half, before a distributor is known.</summary>
+    public string WizardSubtitle => WizardStep is WizardStep.Open_Distributor or WizardStep.Open_LoadVehicle
+        ? string.Empty
+        : _wizardDistributorName;
+
+    /// <summary>1-based step number across the whole wizard, so both halves share one count.</summary>
+    public int WizardStepNumber => WizardStep switch
+    {
+        WizardStep.Open_Distributor  => 1,
+        WizardStep.Open_LoadVehicle  => 2,
+        WizardStep.Settle_Customer   => 3,
+        WizardStep.Settle_Products   => 4,
+        WizardStep.Settle_Finish     => 5,
+        _ => 0,
+    };
+
+    public int WizardStepCount => 5;
+
+    /// <summary>Short action label for the stepper, e.g. «اختر العميل».</summary>
+    public string WizardStepName => WizardStep switch
+    {
+        WizardStep.Open_Distributor => "اختر الموزع",
+        WizardStep.Open_LoadVehicle => "حمّل السيارة",
+        WizardStep.Settle_Customer  => "اختر العميل",
+        WizardStep.Settle_Products  => $"فاتورة {_wizardCurrentCustomerName}",
+        WizardStep.Settle_Finish    => "إنهاء وتسوية",
         _ => string.Empty,
     };
+
+    public string WizardStepText => $"الخطوة {WizardStepNumber} من {WizardStepCount} — {WizardStepName}";
+
+    /// <summary>False when the van carries nothing, so the invoice step can say so instead of showing an empty grid.</summary>
+    public bool WizardHasVehicleProducts => WizardProducts.Count > 0;
+
+    /// <summary>False when every distributor already has a round open, so step 1 can explain the empty combo.</summary>
+    public bool HasAvailableDistributors => AvailableDistributorsForNewSession.Count > 0;
+
+    // Stepper: a step is "done" once the wizard has moved past it. Whether it is the *current* one is
+    // already answered by the IsWizard_* flags, so only the "done" half needs new state.
+    public bool WizardStepDone1 => WizardStepNumber > 1;
+    public bool WizardStepDone2 => WizardStepNumber > 2;
+    public bool WizardStepDone3 => WizardStepNumber > 3;
+    public bool WizardStepDone4 => WizardStepNumber > 4;
+
+    /// <summary>True on the steps that sit behind another, so the footer needs one «رجوع» button.</summary>
+    public bool IsWizard_CanGoBack => WizardStep is WizardStep.Open_LoadVehicle
+                                                or WizardStep.Settle_Products
+                                                or WizardStep.Settle_Finish;
+
+    /// <summary>
+    /// The empty-state flags are computed rather than counted in XAML: a bare
+    /// <c>{Binding SomeCollection.Count}</c> on IsVisible is not a boolean and silently leaves the
+    /// element shown, which is how the "no distributors" note never appeared.
+    /// </summary>
+    public bool HasCustomerResults  => WizardCustomerResults.Count > 0;
+    public bool HasUnsoldStock      => WizardUnsoldStockItems.Count > 0;
 
     partial void OnWizardStepChanged(WizardStep value)
     {
@@ -301,15 +363,71 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
         OnPropertyChanged(nameof(IsWizard_SettleFinish));
         OnPropertyChanged(nameof(IsWizard_CanFinish));
         OnPropertyChanged(nameof(WizardTitle));
+        OnPropertyChanged(nameof(WizardSubtitle));
+        OnPropertyChanged(nameof(WizardStepNumber));
+        OnPropertyChanged(nameof(WizardStepName));
+        OnPropertyChanged(nameof(WizardStepText));
+        OnPropertyChanged(nameof(WizardStepDone1));
+        OnPropertyChanged(nameof(WizardStepDone2));
+        OnPropertyChanged(nameof(WizardStepDone3));
+        OnPropertyChanged(nameof(WizardStepDone4));
+        OnPropertyChanged(nameof(IsWizard_CanGoBack));
+        NotifyWizardCommands();
+    }
+
+    // ── Wizard command availability ───────────────────────────────────────────
+    //
+    // Every primary button in the wizard used to stay enabled in every state, so the only way to
+    // learn what a step was waiting for was to press «التالي» and read the error banner. These
+    // predicates let each button carry its own precondition — a disabled button that means
+    // "nothing picked yet" says more than an enabled one that fails.
+
+    private bool CanNextOpenToLoad()       => SelectedDistributorForNewSession is not null;
+    private bool CanConfirmLoadVehicle()   => WizardSelectedWarehouse is not null
+                                           && WizardProducts.Any(p => p.Quantity > 0);
+    private bool CanNextSettleToProducts() => WizardSelectedCustomer is not null;
+    private bool CanRegisterInvoice()      => WizardSelectedCustomer is not null
+                                           && (WizardCartTotalAmount > 0m || WizardDebtCollectionAmount > 0m);
+
+    private void NotifyWizardCommands()
+    {
+        WizardNext_OpenToLoadCommand.NotifyCanExecuteChanged();
+        WizardConfirmLoadVehicleCommand.NotifyCanExecuteChanged();
+        WizardNext_SettleToProductsCommand.NotifyCanExecuteChanged();
+        WizardRegisterInvoiceCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// <see cref="WizardProducts"/> is rebuilt on every entry into a step, so each item is hooked as
+    /// it arrives; the previous items are discarded with the collection.
+    /// </summary>
+    private void AddWizardProduct(WizardProductButton product)
+    {
+        product.PropertyChanged += OnWizardProductChanged;
+        WizardProducts.Add(product);
+        OnPropertyChanged(nameof(WizardHasVehicleProducts));
+    }
+
+    private void OnWizardProductChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(WizardProductButton.Quantity) or nameof(WizardProductButton.SelectedUnit)))
+            return;
+        NotifyWizardCommands();
     }
 
     // Wizard: Open session
     public ObservableCollection<DistributorLookupItem>   AvailableDistributorsForNewSession { get; } = [];
-    [ObservableProperty] private DistributorLookupItem?  _selectedDistributorForNewSession;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(WizardNext_OpenToLoadCommand))]
+    private DistributorLookupItem? _selectedDistributorForNewSession;
     public ObservableCollection<WarehouseLocationOption> WizardWarehouseOptions { get; } = [];
-    [ObservableProperty] private WarehouseLocationOption? _wizardSelectedWarehouse;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(WizardConfirmLoadVehicleCommand))]
+    private WarehouseLocationOption? _wizardSelectedWarehouse;
 
     private int    _wizardCreatedSessionId;
+    private int    _wizardCreatedDistributorId;
+    private bool   _wizardVehicleLoaded;
     private string _wizardDistributorName = string.Empty;
     private int    _wizardVehicleLocationId;
 
@@ -319,8 +437,19 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
     private decimal _wizardTotalSales;
 
     [ObservableProperty] private string _wizardCustomerSearch = string.Empty;
+
+    /// <summary>
+    /// Set while the search box is being filled in for the user rather than by them. Picking a
+    /// customer types their name into the box, and that is not a search: without this the round trip
+    /// it set going put the customer straight back into the list they had just been picked from.
+    /// </summary>
+    private bool _wizardCustomerSearchIsProgrammatic;
+
     public ObservableCollection<CustomerLookupItem> WizardCustomerResults { get; } = [];
-    [ObservableProperty] private CustomerLookupItem? _wizardSelectedCustomer;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(WizardNext_SettleToProductsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(WizardRegisterInvoiceCommand))]
+    private CustomerLookupItem? _wizardSelectedCustomer;
 
     // New customer inline form
     [ObservableProperty] private bool   _wizardIsNewCustomerVisible;
@@ -340,7 +469,9 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
     [ObservableProperty] private string  _wizardPaymentMode = "Cash"; // "Cash", "Credit", "Partial"
     [ObservableProperty] private decimal _wizardPaidAmount;
     [ObservableProperty] private string  _wizardPaidAmountText = "0.00";
-    [ObservableProperty] private decimal _wizardDebtCollectionAmount;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(WizardRegisterInvoiceCommand))]
+    private decimal _wizardDebtCollectionAmount;
     [ObservableProperty] private string  _wizardDebtCollectionText = "0.00";
     [ObservableProperty] private decimal _wizardCustomerPreviousBalance;
     [ObservableProperty] private string  _wizardCustomerPreviousBalanceText = "0.00 ج.م";
@@ -527,7 +658,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
                     s.ExpectedCash ?? 0m));
             }
 
-            OpenSessionsCountText = $"{openCount} جولة مفتوحة";
+            OpenSessionsCountText = ArabicText.Count(openCount, "جولة مفتوحة", "جولتان مفتوحتان", "جولات مفتوحة");
             TotalSalesText        = $"{totalSales:N2} ج.م";
             TotalCollectionsText  = $"{totalCollections:N2} ج.م";
             TotalCommissionsText  = $"{totalCommissions:N2} ج.م";
@@ -563,10 +694,12 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             if (AvailableDistributorsForNewSession.Count > 0 && SelectedDistributorForNewSession is null)
                 SelectedDistributorForNewSession = AvailableDistributorsForNewSession[0];
 
+            OnPropertyChanged(nameof(HasAvailableDistributors));
+
             RefreshFilterChoices(distributors);
             CalculateReports(sessions, distributors);
 
-            StatusMessage = $"تم التحميل — {Rows.Count} جولة، {Distributors.Count} موزع";
+            StatusMessage = $"تم التحميل — {ArabicText.Count(Rows.Count, "جولة", "جولتان", "جولات")}، {ArabicText.Count(Distributors.Count, "موزع", "موزعان", "موزعون")}";
         }
         catch (Exception ex)
         {
@@ -629,7 +762,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
         ReportTotalCollectionsText = $"{kpiCollections:N2} ج.م";
         ReportTotalCommissionsText = $"{kpiCommissions:N2} ج.م";
         ReportNetCashDiffText      = $"{kpiCashDiff:N2} ج.م";
-        ReportSessionsCountText    = $"{kpiSessions} جولة";
+        ReportSessionsCountText    = ArabicText.Count(kpiSessions, "جولة", "جولتان", "جولات");
         ReportIsNetCashDiffNegative = kpiCashDiff < 0m;
     }
 
@@ -779,17 +912,71 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
     private void OpenSessionWizard()
     {
         WizardError = string.Empty;
-        _wizardCreatedSessionId = 0;
+        ForgetCreatedRound();
         SelectedDistributorForNewSession = AvailableDistributorsForNewSession.FirstOrDefault();
         WizardStep = WizardStep.Open_Distributor;
     }
 
+    /// <summary>
+    /// Drops the round this wizard opened, if it is still unused. Opening a session writes nothing
+    /// but the session row, so a round the operator backs out of would otherwise sit there holding
+    /// the distributor's slot: the open-session guard keeps him off the picker, and the partial
+    /// unique index blocks a brand new round.
+    ///
+    /// A round whose vehicle was already loaded is a real round and is handed over, not abandoned.
+    /// Never throws — this runs on the cancel path, where refusing to close the dialog would be
+    /// worse than leaving a row behind, so a failure is reported and the dialog still closes.
+    /// </summary>
+    private async Task AbandonCreatedRoundAsync()
+    {
+        var sessionId = _wizardCreatedSessionId;
+        var loaded    = _wizardVehicleLoaded;
+        ForgetCreatedRound();
+
+        if (sessionId == 0 || loaded) return;
+
+        try
+        {
+            using var scope = _services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<DaftarContext>();
+            var svc = new DistributorSessionService(db, new StockCountService(db), new StockTransferPostingService(db));
+            await svc.AbandonAsync(sessionId, userId: 1);
+        }
+        catch (Exception ex)
+        {
+            _services.Report("Sessions.AbandonCreatedRound", ex);
+            StatusMessage = $"تعذّر إلغاء الجولة #{sessionId} — فيها حركات أو اتقفلت من مكان تاني.";
+        }
+    }
+
+    /// <summary>Stops this wizard owning the round it opened — used once the round is real.</summary>
+    private void ForgetCreatedRound()
+    {
+        _wizardCreatedSessionId     = 0;
+        _wizardCreatedDistributorId = 0;
+        _wizardVehicleLoaded        = false;
+    }
+
     /// <summary>Creates the session, then transitions to the load-vehicle step.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanNextOpenToLoad))]
     private async Task WizardNext_OpenToLoadAsync()
     {
         if (SelectedDistributorForNewSession is null)
         { WizardError = "يرجى اختيار الموزع."; return; }
+
+        // Same distributor as the round we already hold: reuse it rather than opening a second one,
+        // which the open-session guard would refuse with a raw domain error.
+        if (_wizardCreatedSessionId != 0
+            && _wizardCreatedDistributorId == SelectedDistributorForNewSession.Id)
+        {
+            WizardError = string.Empty;
+            StatusMessage = $"تم فتح الجولة #{_wizardCreatedSessionId}. اختر المنتجات للتحميل.";
+            WizardStep = WizardStep.Open_LoadVehicle;
+            return;
+        }
+
+        // A different distributor, or no round yet: the held round is not ours to keep.
+        await AbandonCreatedRoundAsync();
 
         IsBusy = true; WizardError = string.Empty; StatusMessage = "جاري فتح الجولة...";
         try
@@ -798,7 +985,8 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             var db = scope.ServiceProvider.GetRequiredService<DaftarContext>();
             var svc = new DistributorSessionService(db, new StockCountService(db), new StockTransferPostingService(db));
             var session = await svc.OpenAsync(SelectedDistributorForNewSession.Id, userId: 1);
-            _wizardCreatedSessionId = session.Id;
+            _wizardCreatedSessionId     = session.Id;
+            _wizardCreatedDistributorId = SelectedDistributorForNewSession.Id;
             _wizardDistributorName  = SelectedDistributorForNewSession.Name;
 
             var distributor = await db.Distributors.AsNoTracking()
@@ -822,7 +1010,12 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
         catch (Exception ex)
         {
             _services.Report("Sessions.WizardNext_OpenToLoadAsync", ex);
-            WizardError = $"فشل فتح الجولة: {ex.Message}";
+
+            // OpenAsync's only domain refusal is "this distributor already has an open session";
+            // showing its English text inside an Arabic dialog told the operator nothing useful.
+            WizardError = ex is DomainException
+                ? "تعذّر فتح جولة — الموزع عنده جولة مفتوحة بالفعل. اقفلها من زر «تسوية» الأول."
+                : $"فشل فتح الجولة: {ex.Message}";
             StatusMessage = WizardError;
         }
         finally { IsBusy = false; }
@@ -841,7 +1034,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     WizardProducts.Clear();
-                    foreach (var i in items) WizardProducts.Add(i);
+                    foreach (var i in items) AddWizardProduct(i);
                 });
             }
             catch { /* silent */ }
@@ -852,7 +1045,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
     {
         var items = await BuildWarehouseProductButtonsAsync(db);
         WizardProducts.Clear();
-        foreach (var i in items) WizardProducts.Add(i);
+        foreach (var i in items) AddWizardProduct(i);
     }
 
     private async Task<List<WizardProductButton>> BuildWarehouseProductButtonsAsync(DaftarContext db)
@@ -899,7 +1092,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
         return result;
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanConfirmLoadVehicle))]
     private async Task WizardConfirmLoadVehicleAsync()
     {
         var lines = WizardProducts.Where(p => p.Quantity > 0).ToList();
@@ -925,10 +1118,26 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             var db = scope.ServiceProvider.GetRequiredService<DaftarContext>();
             var svc = new DistributorSessionService(db, new StockCountService(db), new StockTransferPostingService(db));
             var args = lines.Select(p => ((int LotId, decimal BaseQuantity))(p.LotId, p.Quantity * p.UnitFactor)).ToList();
-            await svc.LoadVehicleAsync(_wizardCreatedSessionId, WizardSelectedWarehouse.Id, args, userId: 1);
-            WizardStep = WizardStep.None;
-            StatusMessage = $"✔ تم تحميل {lines.Count} صنف على سيارة {_wizardDistributorName}.";
+            var roundId = _wizardCreatedSessionId;
+            await svc.LoadVehicleAsync(roundId, WizardSelectedWarehouse.Id, args, userId: 1);
+
+            // The van is loaded, so this is a real round now and must never be abandoned on cancel.
+            ForgetCreatedRound();
+            StatusMessage = $"✔ تم تحميل {ArabicText.Count(lines.Count, "صنف", "صنفان", "أصناف")} على سيارة {_wizardDistributorName}.";
+
+            // Loading the van used to be the end of the wizard: the dialog closed, and the round turned
+            // up in the list for the user to find again and settle as if it were a separate job. It is
+            // the same job and the van is loaded, so the same dialog carries on into the settle half.
             await LoadAsync();
+            var loadedRow = Rows.FirstOrDefault(r => r.Id == roundId);
+            if (loadedRow is not null)
+            {
+                await OpenSettleWizardAsync(loadedRow);
+            }
+            else
+            {
+                WizardStep = WizardStep.None;
+            }
         }
         catch (Exception ex)
         {
@@ -957,7 +1166,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
         WizardTotalSalesText = "0.00 ج.م";
         WizardError = string.Empty;
         WizardCustomerSearch = string.Empty;
-        WizardCustomerResults.Clear();
+        SetCustomerResults([]);
         WizardSelectedCustomer = null;
         WizardIsNewCustomerVisible = false;
         WizardNewCustomerName = WizardNewCustomerPhone = WizardNewCustomerAddress = WizardNewCustomerError = string.Empty;
@@ -1001,7 +1210,8 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
 
     partial void OnWizardCustomerSearchChanged(string value)
     {
-        if (string.IsNullOrWhiteSpace(value)) { WizardCustomerResults.Clear(); return; }
+        if (_wizardCustomerSearchIsProgrammatic) return;
+        if (string.IsNullOrWhiteSpace(value)) { SetCustomerResults([]); return; }
         _ = Task.Run(async () =>
         {
             try
@@ -1012,13 +1222,19 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
                     .Where(p => p.IsCustomer && p.Name.Contains(value)).Take(8).ToListAsync();
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    WizardCustomerResults.Clear();
-                    foreach (var p in results)
-                        WizardCustomerResults.Add(new CustomerLookupItem(p.Id, p.Name, p.Phone ?? string.Empty));
+                    SetCustomerResults(results.Select(
+                        p => new CustomerLookupItem(p.Id, p.Name, p.Phone ?? string.Empty)));
                 });
             }
-            catch { /* silent */ }
+            catch (Exception ex) { _services.Report("Sessions.WizardCustomerSearch", ex); }
         });
+    }
+
+    private void SetCustomerResults(IEnumerable<CustomerLookupItem> items)
+    {
+        WizardCustomerResults.Clear();
+        foreach (var item in items) WizardCustomerResults.Add(item);
+        OnPropertyChanged(nameof(HasCustomerResults));
     }
 
     [RelayCommand]
@@ -1026,9 +1242,20 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
     {
         if (item is null) return;
         WizardSelectedCustomer = item;
-        WizardCustomerSearch   = item.Name;
-        WizardCustomerResults.Clear();
+        _wizardCustomerSearchIsProgrammatic = true;
+        try { WizardCustomerSearch = item.Name; }
+        finally { _wizardCustomerSearchIsProgrammatic = false; }
+        SetCustomerResults([]);
         WizardIsNewCustomerVisible = false;
+    }
+
+    /// <summary>Releases the picked customer so the next invoice can go to someone else.</summary>
+    [RelayCommand]
+    private void WizardClearCustomer()
+    {
+        WizardSelectedCustomer = null;
+        WizardCustomerSearch   = string.Empty;
+        SetCustomerResults([]);
     }
 
     [RelayCommand]
@@ -1076,8 +1303,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
     }
 
     /// <summary>Confirmed customer → load vehicle stock → go to product step.</summary>
-    /// <summary>Confirmed customer → load vehicle stock → go to product step.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanNextSettleToProducts))]
     private async Task WizardNext_SettleToProductsAsync()
     {
         if (WizardSelectedCustomer is null) { WizardError = "يرجى اختيار العميل."; return; }
@@ -1092,7 +1318,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             var db = scope.ServiceProvider.GetRequiredService<DaftarContext>();
             var items = await BuildVehicleProductButtonsAsync(db);
             WizardProducts.Clear();
-            foreach (var i in items) WizardProducts.Add(i);
+            foreach (var i in items) AddWizardProduct(i);
 
             // Fetch customer current balance
             var balance = await db.PartyAccountTransactions
@@ -1298,7 +1524,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
     }
 
     /// <summary>Posts invoice + cash payment and/or debt collection for current customer.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRegisterInvoice))]
     private async Task WizardRegisterInvoiceAsync()
     {
         if (WizardSelectedCustomer is null) { WizardError = "لا يوجد عميل محدد."; return; }
@@ -1333,11 +1559,15 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             if (l.Quantity > l.Available) { WizardError = $"الكمية لـ '{l.ProductName}' تتجاوز المتاح."; return; }
 
         IsBusy = true; WizardError = string.Empty; StatusMessage = "جاري تسجيل المعاملة...";
+
+        // The scope has to outlive the try. Declared inside it, a `using` is disposed while the
+        // exception unwinds -- before the catch runs -- and that closes the context, and with it the
+        // transaction the catch is about to roll back.
+        using var scope = _services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DaftarContext>();
         TransactionScope? tx = null;
         try
         {
-            using var scope = _services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<DaftarContext>();
             tx = await TransactionScope.BeginAsync(db, CancellationToken.None);
             var today = DateOnly.FromDateTime(DateTime.Now);
 
@@ -1443,9 +1673,10 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
                 : $"✔ تم تسجيل تحصيل {WizardDebtCollectionAmount:N2} ج.م من {WizardSelectedCustomer.Name}";
             StatusMessage = summary;
 
-            // Reset for next customer
-            WizardSelectedCustomer     = null;
-            WizardCustomerSearch       = string.Empty;
+            // The round settles one invoice at a time, but a customer may take several in a row, so
+            // the pick is kept. It used to be cleared here — which dropped the user back on an empty
+            // search box and made «التالي» fail with «يرجى اختيار العميل.» mid-round. «تبديل العميل»
+            // clears it on request instead.
             _wizardCurrentCustomerName = string.Empty;
             WizardPaymentMode          = "Cash";
             WizardPaidAmount           = 0m;
@@ -1453,13 +1684,17 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
             WizardDebtCollectionAmount = 0m;
             WizardDebtCollectionText   = "0.00";
             OnPropertyChanged(nameof(WizardTitle));
+            OnPropertyChanged(nameof(WizardStepName));
+            OnPropertyChanged(nameof(WizardStepText));
             WizardStep = WizardStep.Settle_Customer;
         }
         catch (Exception ex)
         {
             _services.Report("Sessions.WizardRegisterInvoiceAsync", ex);
-            // Without this the invoice and the vouchers committed before the failure, and the
-            // wizard reported the error while leaving the customer half-settled.
+            // Rolls the posting back on the way out of a failure, and declines once the transaction
+            // has committed -- the refresh below the commit runs in this same try, so a failure
+            // there used to reach this line, throw "This SqliteTransaction has completed", and
+            // replace the reason the operator needed with a complaint about the transaction object.
             if (tx is not null) await tx.RollbackAsync();
             WizardError = $"فشل التسجيل: {ex.Message}";
             StatusMessage = WizardError;
@@ -1489,7 +1724,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
                         : $"فاتورة (دفعة {paid:N0})";
             WizardSessionSales.Add(new SessionSaleRow(
                 s.Id, s.DocNo ?? "-", s.Party?.Name ?? "-",
-                kind, $"{s.Items.Count} صنف", s.Total, paid, s.DocDate.ToString("yyyy-MM-dd")));
+                kind, ArabicText.Count(s.Items.Count, "صنف", "صنفان", "أصناف"), s.Total, paid, s.DocDate.ToString("yyyy-MM-dd")));
         }
 
         var directCollections = payments.Where(p => p.SaleId == null).ToList();
@@ -1550,6 +1785,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
                 var displayQty = factor > 0 ? Math.Floor(b.Quantity / factor) : b.Quantity;
                 WizardUnsoldStockItems.Add(new SessionUnsoldStockItem(prod?.Name ?? "-", unit?.Name ?? "وحدة", displayQty));
             }
+            OnPropertyChanged(nameof(HasUnsoldStock));
 
             WizardStep = WizardStep.Settle_Finish;
         }
@@ -1678,7 +1914,7 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
                     i.LineTotal)).ToList();
 
                 string itemsSummary = string.Join("، ", lines.Take(2).Select(l => $"{l.ProductName} ({l.Quantity:N0})"));
-                if (lines.Count > 2) itemsSummary += $" +{lines.Count - 2} أصناف أخرى";
+                if (lines.Count > 2) itemsSummary += $" +{ArabicText.Count(lines.Count - 2, "صنف آخر", "صنفان آخران", "أصناف أخرى")}";
 
                 invoiceRows.Add(new SessionInvoiceDetailRow(
                     sale.Id,
@@ -1781,6 +2017,14 @@ public partial class SessionsViewModel(IServiceProvider services) : ObservableOb
         };
     }
 
+    /// <summary>
+    /// Closes the wizard and drops the round it opened, if that round is still unused. The dialog
+    /// closes first so cancel is instant; the cleanup runs behind it.
+    /// </summary>
     [RelayCommand]
-    private void WizardCancel() => WizardStep = WizardStep.None;
+    private async Task WizardCancelAsync()
+    {
+        WizardStep = WizardStep.None;
+        await AbandonCreatedRoundAsync();
+    }
 }

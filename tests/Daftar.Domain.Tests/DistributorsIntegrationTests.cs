@@ -8,6 +8,7 @@ using Daftar.Domain.Sales;
 using Daftar.Domain.Shared;
 using Daftar.Infrastructure;
 using Daftar.Infrastructure.Services;
+using Daftar.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -66,8 +67,12 @@ public sealed class DistributorsIntegrationTests : IAsyncLifetime, IDisposable
         Party Customer,
         int LotId);
 
-    /// <summary>A distributor with a loaded vehicle, a stocked warehouse lot, and a priced product.</summary>
-    private async Task<Fixture> ArrangeAsync(decimal commissionRate = 10m)
+    /// <summary>
+    /// A distributor with a loaded vehicle, a stocked warehouse lot, and a priced product. The
+    /// customer starts active unless a test is about what the other statuses may do.
+    /// </summary>
+    private async Task<Fixture> ArrangeAsync(
+        decimal commissionRate = 10m, PartyStatus customerStatus = PartyStatus.Active)
     {
         var ctx = NewContext();
 
@@ -95,7 +100,7 @@ public sealed class DistributorsIntegrationTests : IAsyncLifetime, IDisposable
         var customer = new Party
         {
             Code = "CUS-D1", Name = "Retailer", IsCustomer = true,
-            CustomerType = CustomerType.Retail, CreditLimit = 1000m,
+            CustomerType = CustomerType.Retail, CreditLimit = 1000m, Status = customerStatus,
         };
         ctx.Parties.Add(customer);
 
@@ -179,6 +184,127 @@ public sealed class DistributorsIntegrationTests : IAsyncLifetime, IDisposable
         Assert.Single(movements.Select(m => m.SourceId).Distinct());
     }
 
+    /// <summary>
+    /// The wizard's two halves are one job, not two. Loading the vehicle used to end the dialog, and
+    /// the round the operator had just opened turned up in the list for him to find again and settle
+    /// as if it were someone else's work. The same dialog now carries straight on into the settle
+    /// half of the round it just opened.
+    /// </summary>
+    [Fact]
+    public async Task LoadingTheVan_CarriesTheWizardIntoTheSettleHalf()
+    {
+        var f = await ArrangeAsync();
+
+        var vm = new SessionsViewModel(_fixture.Services);
+        await vm.LoadAsync();
+
+        vm.OpenSessionWizardCommand.Execute(null);
+        Assert.Equal(WizardStep.Open_Distributor, vm.WizardStep);
+
+        await vm.WizardNext_OpenToLoadCommand.ExecuteAsync(null);
+        Assert.Equal(WizardStep.Open_LoadVehicle, vm.WizardStep);
+
+        var line = vm.WizardProducts.Single(p => p.ProductName == f.Product.Name);
+        line.Quantity = 10m;
+        Assert.True(vm.WizardConfirmLoadVehicleCommand.CanExecute(null));
+
+        await vm.WizardConfirmLoadVehicleCommand.ExecuteAsync(null);
+
+        Assert.Equal(WizardStep.Settle_Customer, vm.WizardStep);
+        Assert.True(vm.IsWizardVisible);
+
+        // The load really happened on the way in: warehouse down and vehicle up by the same 10.
+        var ctx = NewContext();
+        Assert.Equal(90m, (await ctx.StockBalances.SingleAsync(b => b.LocationId == f.WarehouseId)).Quantity);
+        Assert.Equal(10m, (await ctx.StockBalances.SingleAsync(b => b.LocationId == f.VehicleId)).Quantity);
+    }
+
+    /// <summary>
+    /// Drives the wizard from the session list into the settle half's product step: open the round,
+    /// load the vehicle, pick the customer, and carry the vehicle's stock into the cart.
+    /// </summary>
+    private async Task<SessionsViewModel> DriveToTheProductStepAsync(Fixture f)
+    {
+        var vm = new SessionsViewModel(_fixture.Services);
+        await vm.LoadAsync();
+
+        vm.OpenSessionWizardCommand.Execute(null);
+        await vm.WizardNext_OpenToLoadCommand.ExecuteAsync(null);
+
+        vm.WizardProducts.Single(p => p.ProductName == f.Product.Name).Quantity = 10m;
+        await vm.WizardConfirmLoadVehicleCommand.ExecuteAsync(null);
+        Assert.Equal(WizardStep.Settle_Customer, vm.WizardStep);
+
+        vm.WizardSelectedCustomer =
+            new CustomerLookupItem(f.Customer.Id, f.Customer.Name, f.Customer.Phone ?? string.Empty);
+        await vm.WizardNext_SettleToProductsCommand.ExecuteAsync(null);
+        Assert.Equal(WizardStep.Settle_Products, vm.WizardStep);
+
+        return vm;
+    }
+
+    /// <summary>
+    /// The settle wizard creates the customers it cannot find, and it creates them as
+    /// <see cref="PartyStatus.Pending"/> — "cash only until the manager approves". A sale that leaves
+    /// a balance therefore has to be refused, and the operator has to be told that, not handed a
+    /// complaint about the transaction object: the refusal used to be raised inside a scope that had
+    /// already been disposed, so the rollback that followed threw and replaced the reason.
+    /// </summary>
+    [Fact]
+    public async Task An_Invoice_Leaving_A_Balance_For_A_Pending_Customer_Is_Refused_With_The_Reason()
+    {
+        var f = await ArrangeAsync(customerStatus: PartyStatus.Pending);
+        var vm = await DriveToTheProductStepAsync(f);
+
+        // Every line onto the ledger, nothing taken in cash.
+        vm.WizardProducts.Single(p => p.ProductName == f.Product.Name).Quantity = 1m;
+        vm.WizardPaidAmount = 0m;
+        Assert.True(vm.WizardRegisterInvoiceCommand.CanExecute(null));
+
+        await vm.WizardRegisterInvoiceCommand.ExecuteAsync(null);
+
+        Assert.Equal(
+            $"فشل التسجيل: حساب '{f.Customer.Name}' لسه مستني موافقة المدير — ينفع يشتري نقدي بس.",
+            vm.WizardError);
+        Assert.DoesNotContain("SqliteTransaction", vm.WizardError);
+
+        // The refusal took the invoice and its vouchers with it, leaving nothing behind.
+        var ctx = NewContext();
+        Assert.Empty(await ctx.Sales.ToListAsync());
+        Assert.Empty(await ctx.PartyAccountTransactions.Where(t => t.PartyId == f.Customer.Id).ToListAsync());
+    }
+
+    /// <summary>
+    /// The other half of the same rule: pending means cash only, so a pending customer is still a
+    /// customer. Refusing every non-active account outright — which is what the credit check did —
+    /// made the wizard's own new customers un-invoiceable for any amount.
+    /// </summary>
+    [Fact]
+    public async Task A_Pending_Customer_May_Be_Sold_To_For_Cash()
+    {
+        var f = await ArrangeAsync(customerStatus: PartyStatus.Pending);
+        var vm = await DriveToTheProductStepAsync(f);
+
+        vm.WizardProducts.Single(p => p.ProductName == f.Product.Name).Quantity = 2m;
+        vm.SetWizardPaymentCashCommand.Execute(null);
+        Assert.Equal(vm.WizardCartTotalAmount, vm.WizardPaidAmount);
+
+        await vm.WizardRegisterInvoiceCommand.ExecuteAsync(null);
+
+        Assert.Equal(string.Empty, vm.WizardError);
+        Assert.StartsWith("✔ تم تسجيل", vm.StatusMessage);
+
+        var ctx = NewContext();
+        var sale = await ctx.Sales.SingleAsync();
+        Assert.Equal(40m, sale.Total);
+
+        // Paid in full, so nothing is left owing and no credit was taken.
+        Assert.Equal(0m, await ctx.PartyAccountTransactions
+            .Where(t => t.PartyId == f.Customer.Id)
+            .Select(t => (decimal?)t.Amount)
+            .SumAsync() ?? 0m);
+    }
+
     [Fact]
     public async Task OneOpenSessionPerDistributor_IsEnforcedByTheDatabase()
     {
@@ -200,6 +326,115 @@ public sealed class DistributorsIntegrationTests : IAsyncLifetime, IDisposable
 
         var sqliteMessage = error.InnerException?.Message ?? error.Message;
         Assert.Contains("UNIQUE", sqliteMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static DistributorSessionService NewSessionService(DaftarContext ctx) =>
+        new(ctx, new StockCountService(ctx), new StockTransferPostingService(ctx));
+
+    [Fact]
+    public async Task AbandoningAnUnusedRound_ReleasesTheDistributor()
+    {
+        var f = await ArrangeAsync();
+        var ctx = NewContext();
+        var session = await OpenSessionAsync(ctx, f.Distributor.Id);
+
+        await NewSessionService(ctx).AbandonAsync(session.Id, userId: 1);
+
+        // The row is gone, and the distributor can open a fresh round immediately. Left behind, the
+        // round is invisible on the picker while the partial unique index blocks every retry.
+        Assert.False(await ctx.DistributorSessions.AnyAsync(s => s.Id == session.Id));
+
+        var reopened = await OpenSessionAsync(ctx, f.Distributor.Id);
+        Assert.NotEqual(session.Id, reopened.Id);
+    }
+
+    [Fact]
+    public async Task AbandoningARoundWithAStockTransferOnIt_IsRefused()
+    {
+        var f = await ArrangeAsync();
+        var ctx = NewContext();
+        var session = await OpenSessionAsync(ctx, f.Distributor.Id);
+        await LoadVanAsync(ctx, session, f, 10m);
+
+        var error = await Assert.ThrowsAsync<DomainException>(
+            () => NewSessionService(ctx).AbandonAsync(session.Id, userId: 1));
+
+        Assert.Contains("stock transfer", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(await ctx.DistributorSessions.AnyAsync(s => s.Id == session.Id));
+    }
+
+    [Fact]
+    public async Task AbandoningARoundWithASaleOnIt_IsRefused()
+    {
+        var f = await ArrangeAsync();
+        var ctx = NewContext();
+        var session = await OpenSessionAsync(ctx, f.Distributor.Id);
+
+        // A draft invoice is still a commitment against the round, so it counts even unposted.
+        ctx.Sales.Add(new Sale
+        {
+            Type = SaleType.Invoice,
+            PartyId = f.Customer.Id,
+            LocationId = f.VehicleId,
+            PriceListId = f.List.Id,
+            DocDate = Today,
+            DistributorId = f.Distributor.Id,
+            DistributorSessionId = session.Id,
+        });
+        await ctx.SaveChangesAsync();
+
+        var error = await Assert.ThrowsAsync<DomainException>(
+            () => NewSessionService(ctx).AbandonAsync(session.Id, userId: 1));
+
+        Assert.Contains("sales", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(await ctx.DistributorSessions.AnyAsync(s => s.Id == session.Id));
+    }
+
+    [Fact]
+    public async Task AbandoningARoundWithACollectionOnIt_IsRefused()
+    {
+        var f = await ArrangeAsync();
+        var ctx = NewContext();
+        var session = await OpenSessionAsync(ctx, f.Distributor.Id);
+
+        ctx.Payments.Add(new Payment
+        {
+            Direction = PaymentDirection.In,
+            PartyId = f.Customer.Id,
+            CashAccountId = f.CustodyId,
+            Amount = 100m,
+            DocDate = Today,
+            DistributorSessionId = session.Id,
+        });
+        await ctx.SaveChangesAsync();
+
+        var error = await Assert.ThrowsAsync<DomainException>(
+            () => NewSessionService(ctx).AbandonAsync(session.Id, userId: 1));
+
+        Assert.Contains("collection", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(await ctx.DistributorSessions.AnyAsync(s => s.Id == session.Id));
+    }
+
+    [Fact]
+    public async Task AbandoningASettledRound_IsRefused()
+    {
+        var (_, session, _, ctx) = await SettleAShortSessionAsync();
+
+        var error = await Assert.ThrowsAsync<DomainException>(
+            () => NewSessionService(ctx).AbandonAsync(session.Id, userId: 1));
+
+        Assert.Contains("closed", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(await ctx.DistributorSessions.AnyAsync(s => s.Id == session.Id));
+    }
+
+    [Fact]
+    public async Task AbandoningARoundThatDoesNotExist_IsRefused()
+    {
+        await ArrangeAsync();
+        var ctx = NewContext();
+
+        await Assert.ThrowsAsync<DomainException>(
+            () => NewSessionService(ctx).AbandonAsync(9999, userId: 1));
     }
 
     [Fact]

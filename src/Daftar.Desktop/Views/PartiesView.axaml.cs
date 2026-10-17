@@ -23,7 +23,7 @@ public partial class PartiesView : UserControl
             return;
 
         _loaded = true;
-        await vm.InitializeAsync();
+        await ScreenLoad.Run(vm.InitializeAsync);
     }
 }
 

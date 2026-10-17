@@ -115,7 +115,7 @@ public partial class ReceiveViewModel
             await BuildScanRowsAsync(invoice);
 
             HasScan = true;
-            ScanStatus = $"اتقرا {Scanned.Count} سطر — راجعه قبل ما تضيفه";
+            ScanStatus = $"اتقرا {ArabicText.Count(Scanned.Count, "سطر", "سطران", "أسطر")} — راجعه قبل ما تضيفه";
         }
         catch (Exception ex)
         {
@@ -288,8 +288,8 @@ public partial class ReceiveViewModel
 
         var skipped = Scanned.Count - ready.Count;
         Status = skipped == 0
-            ? $"تمت إضافة {ready.Count} سطر من الفاتورة"
-            : $"تمت إضافة {ready.Count} سطر — اتخطي {skipped} سطر ناقص";
+            ? $"تمت إضافة {ArabicText.Count(ready.Count, "سطر", "سطران", "أسطر")} من الفاتورة"
+            : $"تمت إضافة {ArabicText.Count(ready.Count, "سطر", "سطران", "أسطر")} — اتخطي {ArabicText.Count(skipped, "سطر ناقص", "سطران ناقصان", "أسطر ناقصة")}";
 
         Scanned.Clear();
         HasScan = false;

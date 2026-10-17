@@ -69,6 +69,33 @@ sealed class Program
                     "التفاصيل: " + report);
             }
 
+            // Safety net, not the fix. Screens now report their own load failures through
+            // ScreenLoad, but an async void anywhere else still lands here, and an unhandled
+            // exception on the dispatcher ends the process with a black window and nothing said.
+            // Logging it and saying so is what a shop needs: the books are untouched and the rest
+            // of the day can carry on.
+            //
+            // Every occurrence is logged. Only the first of a given fault opens a dialog: an
+            // exception thrown inside a render pass fires every frame, and a dialog per frame is
+            // an uncloseable flood — worse than the black window this net exists to prevent.
+            Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+            {
+                Log("ERROR", "Unhandled exception on the UI thread", e.Exception);
+
+                if (RepeatedFault.ShouldSpeak(e.Exception))
+                {
+                    StartupError.Show(
+                        "حصل خطأ في البرنامج",
+                        "حصل خطأ أثناء فتح إحدى الصفحات، وسُجّل بالكامل في ملف السجل." + Environment.NewLine +
+                        Environment.NewLine +
+                        "بياناتك ما اتغيّرتش. كمّل شغلك عادي، ولو الخطأ اتكرر ابعت لنا السجل." +
+                        Environment.NewLine + Environment.NewLine +
+                        e.Exception.Message);
+                }
+
+                e.Handled = true;
+            };
+
             BuildAvaloniaApp(services).StartWithClassicDesktopLifetime(args);
             return 0;
         }
@@ -96,10 +123,15 @@ sealed class Program
     }
 
     /// <summary>
-    /// Diagnostics go to a file next to the database. Console.WriteLine reached nowhere in a GUI
-    /// process, which is how a corrupted ledger could start up silently every single time.
+    /// Appends to today's log. Diagnostics go to a file next to the database because
+    /// Console.WriteLine reached nowhere in a GUI process, which is how a corrupted ledger could
+    /// start up silently every single time.
+    /// <para>
+    /// Internal rather than private so <see cref="Views.ScreenLoadFailure"/> can use it instead of
+    /// writing a second, differently-shaped copy of the same line.
+    /// </para>
     /// </summary>
-    private static void Log(string level, string message, Exception? ex)
+    internal static void Log(string level, string message, Exception? ex)
     {
         try
         {

@@ -23,6 +23,6 @@ public partial class PaymentsView : UserControl
             return;
 
         _loaded = true;
-        await vm.LoadAsync();
+        await ScreenLoad.Run(vm.LoadAsync, m => vm.Status = m);
     }
 }

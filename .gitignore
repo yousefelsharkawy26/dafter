@@ -3,3 +3,4 @@ obj/
 
 # Written by the view rendering tests on every run.
 screenshots/
+.daftar-manual-test/

@@ -70,6 +70,56 @@ public sealed class DistributorSessionService(
         return session;
     }
 
+    /// <summary>
+    /// Throws away a round that was opened but never used. Opening a session writes nothing but the
+    /// session row itself, so a round the operator cancelled before loading the vehicle is pure
+    /// bookkeeping — and leaving it behind blocks the distributor from opening another one, because
+    /// both the open-session guard above and the partial unique index key on it.
+    ///
+    /// Refuses to touch a round that has any business against it: stock moved, an invoice written,
+    /// cash collected, a count started, or a settlement. Those are history; they get closed, never
+    /// deleted.
+    /// </summary>
+    public async Task AbandonAsync(
+        int sessionId,
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        // Opening and abandoning are the same authority: whoever may start a round may drop it.
+        context.RequirePermission(Daftar.Domain.Security.Role.Codes.PaymentsManage);
+        userId = context.PostingActor(userId);
+
+        var session = await context.DistributorSessions
+            .FirstOrDefaultAsync(s => s.Id == sessionId, cancellationToken)
+            ?? throw new DomainException($"Session {sessionId} does not exist.");
+
+        if (!session.IsOpen)
+            throw new DomainException($"Session {sessionId} is already closed.");
+
+        // Every kind of activity a session can carry. Checked one at a time so the message names
+        // which one refused the delete rather than just saying no.
+        if (await context.StockTransfers.AnyAsync(t => t.DistributorSessionId == sessionId, cancellationToken))
+            throw new DomainException($"Session {sessionId} has a stock transfer against it and cannot be abandoned.");
+
+        if (await context.Sales.AnyAsync(s => s.DistributorSessionId == sessionId, cancellationToken))
+            throw new DomainException($"Session {sessionId} has sales against it and cannot be abandoned.");
+
+        if (await context.Payments.AnyAsync(p => p.DistributorSessionId == sessionId, cancellationToken))
+            throw new DomainException($"Session {sessionId} has collections against it and cannot be abandoned.");
+
+        if (await context.CashTransactions.AnyAsync(c => c.DistributorSessionId == sessionId, cancellationToken))
+            throw new DomainException($"Session {sessionId} has cash movements against it and cannot be abandoned.");
+
+        if (await context.StockCounts.AnyAsync(c => c.DistributorSessionId == sessionId, cancellationToken))
+            throw new DomainException($"Session {sessionId} has a stock count against it and cannot be abandoned.");
+
+        if (await context.InventoryMovements.AnyAsync(m => m.DistributorSessionId == sessionId, cancellationToken))
+            throw new DomainException($"Session {sessionId} has inventory movements against it and cannot be abandoned.");
+
+        context.DistributorSessions.Remove(session);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     /// <summary>Moves stock from the warehouse onto his vehicle, tagged to his session.</summary>
     public async Task<TransferPostingResult> LoadVehicleAsync(
         int sessionId,

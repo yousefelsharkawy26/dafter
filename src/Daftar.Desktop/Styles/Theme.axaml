@@ -23,6 +23,8 @@
     </Style>
     <Style Selector="ComboBox">
         <Setter Property="CornerRadius" Value="0" />
+        <!-- Fix: selected-item text invisible against control background -->
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
     </Style>
     <Style Selector="ComboBoxItem">
         <Setter Property="CornerRadius" Value="0" />

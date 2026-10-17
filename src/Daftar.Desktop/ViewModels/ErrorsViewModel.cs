@@ -47,7 +47,7 @@ public partial class ErrorsViewModel : ObservableObject
     /// <summary>Headline: how bad, and how recent. The rest is only worth reading if this is.</summary>
     public string SummaryText => Entries.Count == 0
         ? "مفيش أخطاء مسجّلة."
-        : $"{Entries.Count} خطأ في آخر ١٤ يوم — الأحدث: {Entries[0].TimeText}";
+        : $"{ArabicText.Count(Entries.Count, "خطأ", "خطآن", "أخطاء")} في آخر 14 يوم — الأحدث: {Entries[0].TimeText}";
 
     partial void OnSelectedChanged(LogEntry? value) => OnPropertyChanged(nameof(HasSelection));
 

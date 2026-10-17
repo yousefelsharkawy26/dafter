@@ -195,7 +195,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
             {
                 0 => "لا توجد صلاحيات",
                 _ when codes.Count >= Role.Codes.All.Length => "كافة الصلاحيات (مسؤول نظام)",
-                _ => $"{codes.Count} صلاحيات ({string.Join(", ", codes.Take(3))}...)"
+                _ => $"{ArabicText.Count(codes.Count, "صلاحية", "صلاحيتان", "صلاحيات")} ({string.Join(", ", codes.Take(3))}...)"
             };
 
             RolesList.Add(new RoleListItem(
@@ -354,7 +354,7 @@ public partial class SettingsViewModel(IServiceProvider services) : ObservableOb
             RefreshBackups();
 
             BackupStatusMessage = pruned > 0
-                ? $"تم حفظ النسخة الاحتياطية بنجاح ✓، وتم مسح {pruned} نسخة قديمة."
+                ? $"تم حفظ النسخة الاحتياطية بنجاح ✓، وتم مسح {ArabicText.Count(pruned, "نسخة قديمة", "نسختان قديمتان", "نسخ قديمة")}."
                 : "تم حفظ النسخة الاحتياطية بنجاح ✓";
         }
         catch (Exception ex)

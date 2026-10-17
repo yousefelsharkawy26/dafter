@@ -50,7 +50,10 @@ public sealed class ErrorsScreenTests
         vm.Entries.Add(Fault("older"));
 
         Assert.True(vm.HasEntries);
-        Assert.Contains("2 خطأ", vm.SummaryText, StringComparison.Ordinal);
+
+        // Two faults take the dual, and the count and the noun are built together so that they
+        // cannot disagree about which form that is.
+        Assert.Contains("2 خطآن", vm.SummaryText, StringComparison.Ordinal);
         Assert.Contains("11/10 14:23:45", vm.SummaryText, StringComparison.Ordinal);
     }
 

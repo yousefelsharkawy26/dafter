@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Daftar.ViewModels"
+             xmlns:components="using:Daftar.Views.Components"
              xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -87,19 +88,7 @@
                 <Grid RowDefinitions="Auto,Auto,*" Margin="10">
 
                     <!-- Search Input -->
-                    <TextBox Grid.Row="0"
-                             Text="{Binding SearchText, Mode=TwoWay}"
-                             PlaceholderText="ابحث بالاسم، الكود SKU، أو الباركود..."
-                             Height="38"
-                             VerticalContentAlignment="Center"
-                             Margin="0,0,0,8">
-                        <TextBox.InnerLeftContent>
-                            <PathIcon Data="{StaticResource IconSearch}"
-                                      Width="15" Height="15"
-                                      Margin="10,0"
-                                      Opacity="0.6" />
-                        </TextBox.InnerLeftContent>
-                    </TextBox>
+                    <components:SearchBox Grid.Row="0" Margin="0,0,0,8" Text="{Binding SearchText, Mode=TwoWay}" Placeholder="ابحث بالاسم، الكود SKU، أو الباركود..." />
 
                     <!-- Filter Chips -->
                     <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="4" Margin="0,0,0,8">
@@ -159,7 +148,7 @@
                                                 </Border>
 
                                                 <TextBlock Grid.Column="1"
-                                                           Text="{Binding UnitsCount, StringFormat='{}{0} وحدة'}"
+                                                           Text="{Binding UnitsCount, Converter={StaticResource ArabicCount}, ConverterParameter='وحدة|وحدتان|وحدات'}"
                                                            Classes="caption muted"
                                                            VerticalAlignment="Center" />
 

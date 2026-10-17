@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
+             xmlns:vm="using:Daftar.ViewModels"
+             xmlns:views="using:Daftar.Views.Components"
+             x:Class="Daftar.Views.Components.ProductTileGrid"
+             FlowDirection="RightToLeft">
+
+    <!--
+        The grid of product squares. Both screens carried this block — the repeater, the uniform
+        grid layout and the tile template — identical down to the spacing, and each had to be kept
+        in step by hand. Neither screen knows anything about how a tile looks: it hands over a list
+        of ProductTileItem and that is the whole contract.
+
+        The empty state is here too. Both screens were writing it out, and the hint had drifted by
+        one vowel between them, which is the kind of difference nobody decides and everybody sees.
+    -->
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      IsVisible="{Binding HasItems, RelativeSource={RelativeSource AncestorType=views:ProductTileGrid}}">
+            <ui:FAItemsRepeater ItemsSource="{Binding ItemsSource, RelativeSource={RelativeSource AncestorType=views:ProductTileGrid}}"
+                               Margin="0,0,0,8">
+                <ui:FAItemsRepeater.Layout>
+                    <ui:FAUniformGridLayout MinItemWidth="{StaticResource TileMinWidth}"
+                                            MinItemHeight="{StaticResource TileHeight}"
+                                            MinRowSpacing="{StaticResource SpaceSm}"
+                                            MinColumnSpacing="{StaticResource SpaceSm}"
+                                            ItemsStretch="Fill" />
+                </ui:FAItemsRepeater.Layout>
+
+                <ui:FAItemsRepeater.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ProductTileItem">
+                        <views:ProductTileView />
+                    </DataTemplate>
+                </ui:FAItemsRepeater.ItemTemplate>
+            </ui:FAItemsRepeater>
+        </ScrollViewer>
+
+        <StackPanel Spacing="{StaticResource SpaceXs}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsVisible="{Binding !HasItems, RelativeSource={RelativeSource AncestorType=views:ProductTileGrid}}">
+            <PathIcon Data="{StaticResource IconSearch}"
+                      Width="40"
+                      Height="40"
+                      Opacity="0.35"
+                      HorizontalAlignment="Center" />
+            <TextBlock Text="لا توجد أصناف مطابقة"
+                       Classes="subtitle"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="جرّب اسماً آخر أو امسح الباركود"
+                       Classes="caption"
+                       HorizontalAlignment="Center" />
+        </StackPanel>
+    </Grid>
+</UserControl>

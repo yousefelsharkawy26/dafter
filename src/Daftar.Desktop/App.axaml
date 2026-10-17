@@ -21,6 +21,15 @@
             <conv:BoolToMarkConverter x:Key="BoolToMark" />
             <conv:BoolToBrushConverter x:Key="BoolToBrush" />
             <conv:BoolToBrushConverter x:Key="BoolToDimBrush" Dim="True" />
+
+            <!-- A count and the form of the word that agrees with it. Reviews and counters were
+                 written with the singular after every number, so five rounds read "5 جولة". -->
+            <conv:ArabicCountConverter x:Key="ArabicCount" />
+
+            <!-- The same three forms, the word alone: for a tile that prints the number in a size
+                 of its own and the noun beside it smaller, where the whole phrase would print the
+                 number twice. -->
+            <conv:ArabicNounConverter x:Key="ArabicNoun" />
         </ResourceDictionary>
     </Application.Resources>
 

@@ -38,7 +38,7 @@ public partial class ReportsView : UserControl
         // Only the owner would have had the columns corrected, and only after their first load.
         ApplyCostColumns(vm.CanViewCost);
 
-        await vm.InitializeAsync();
+        await ScreenLoad.Run(vm.InitializeAsync);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

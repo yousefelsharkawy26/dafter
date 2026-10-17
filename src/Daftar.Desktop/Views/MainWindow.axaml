@@ -271,7 +271,7 @@
                                                                FontSize="26" FontWeight="Bold" Foreground="White" />
                                                     <TextBlock Text="ج.م" FontSize="13" Foreground="#C8E4FF" VerticalAlignment="Bottom" Margin="0,0,0,3" />
                                                 </StackPanel>
-                                                <TextBlock Text="{Binding Stats.TodaySalesCount, FallbackValue='0', StringFormat='عدد الفواتير: {0} فاتورة'}"
+                                                <TextBlock Text="{Binding Stats.TodaySalesCount, FallbackValue='0', Converter={StaticResource ArabicCount}, ConverterParameter='فاتورة|فاتورتان|فواتير', StringFormat='عدد الفواتير: {0}'}"
                                                            FontSize="11" Foreground="#C8E4FF" />
                                             </StackPanel>
                                         </DockPanel>
@@ -352,7 +352,11 @@
                                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                                     <TextBlock Text="{Binding Stats.LowStockCount, FallbackValue='0'}"
                                                                FontSize="22" FontWeight="Bold" Foreground="White" />
-                                                    <TextBlock Text="أصناف" FontSize="13" Foreground="#FFD0D0" VerticalAlignment="Bottom" Margin="0,0,0,3" />
+                                                    <!-- The word moves with the number above it. Written out as the
+                                                         literal "أصناف" it read "1 أصناف" at one product, and the
+                                                         count is the only thing that was ever bound. -->
+                                                    <TextBlock Text="{Binding Stats.LowStockCount, FallbackValue='صنف', Converter={StaticResource ArabicNoun}, ConverterParameter='صنف|صنفان|أصناف'}"
+                                                               FontSize="13" Foreground="#FFD0D0" VerticalAlignment="Bottom" Margin="0,0,0,3" />
                                                 </StackPanel>
                                                 <TextBlock Text="وصلت لحد إعادة الطلب" FontSize="11" Foreground="#FFD0D0" />
                                             </StackPanel>

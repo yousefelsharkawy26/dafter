@@ -109,9 +109,9 @@ public partial class ReportsViewModel(IServiceProvider services) : ObservableObj
     [ObservableProperty] private string _marginPercentText = "0.0%";
     [ObservableProperty] private string _collectionsText = "0.00 ج.م";
     [ObservableProperty] private string _collectionRatioText = "0.0%";
-    [ObservableProperty] private string _invoicesCountText = "0 فاتورة";
+    [ObservableProperty] private string _invoicesCountText = ArabicText.Count(0, "فاتورة", "فاتورتان", "فواتير");
     [ObservableProperty] private string _overdueText = "0.00 ج.م";
-    [ObservableProperty] private string _overdueCountText = "0 متأخرة";
+    [ObservableProperty] private string _overdueCountText = ArabicText.Count(0, "فاتورة متأخرة", "فاتورتان متأخرتان", "فواتير متأخرة");
 
     // ── Collections for UI Binding ────────────────────────────────────────────
     public ObservableCollection<ReportSaleRow> SaleRows { get; } = [];
@@ -413,7 +413,7 @@ public partial class ReportsViewModel(IServiceProvider services) : ObservableObj
             TotalCostText = Money(totalCost);
             TotalMarginText = Money(totalMargin);
             MarginPercentText = CanViewCost ? $"{overallMarginPct:N1}% هامش" : "مخفي";
-            InvoicesCountText = $"{sales.Count} فاتورة";
+            InvoicesCountText = ArabicText.Count(sales.Count, "فاتورة", "فاتورتان", "فواتير");
 
             // 2. Collections in range (PaymentIn)
             var collections = await db.PartyAccountTransactions
@@ -527,7 +527,7 @@ public partial class ReportsViewModel(IServiceProvider services) : ObservableObj
 
             var totalOverdue = balances.Sum(b => b.Balance > 0 ? b.Balance : 0m);
             OverdueText = $"{totalOverdue:N2} ج.م";
-            OverdueCountText = $"{overdueSales.Count} فواتير متأخرة";
+            OverdueCountText = ArabicText.Count(overdueSales.Count, "فاتورة متأخرة", "فاتورتان متأخرتان", "فواتير متأخرة");
 
             // 5. Cash Flow & Treasury Movements
             var cashMovements = await db.CashTransactions
